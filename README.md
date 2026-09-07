@@ -14,9 +14,9 @@ versioning, and publication. See [schema sync](sync/README.md).
 
 ## Packages
 
-The npm package is available as `@rimelabs/api@0.0.1`.
-The Python package `rime-api` is prepared as `0.0.1` but is not yet published.
-After publication, install them with:
+Python [`rime-api`](https://pypi.org/project/rime-api/) and npm
+[`@rimelabs/api`](https://www.npmjs.com/package/@rimelabs/api) are available
+as version `0.0.1`. Install them with:
 
 ```shell
 uv add rime-api
