@@ -1,59 +1,119 @@
 # Release packages
 
 Python `rime-api` and npm `@rimelabs/api` share the version in `VERSION`.
-Package publication is manual. CI builds and tests archives but does not publish.
+`Check packages` builds and tests the archives. `Release packages` publishes
+those same archives through GitHub Actions Trusted Publishing.
+
+## Set up registry access once
+
+Create the GitHub environments `npm-release` and `pypi-release`. For each,
+set deployment branches to selected branches and add only `main`.
+The release workflow also requires `main`.
+
+For npm, the package must exist before you can add a trusted publisher.
+The initial `@rimelabs/api@0.0.1` upload is complete. In the package settings,
+add a GitHub Actions trusted publisher with these values:
+
+| Setting | Value |
+| --- | --- |
+| Organization or user | `rimelabs` |
+| Repository | `rime-api` |
+| Workflow filename | `release.yaml` |
+| Environment | `npm-release` |
+| Permission | Publish |
+
+With npm 11.15 or later, an account with package write access and 2FA can
+also configure this from the terminal:
+
+```shell
+npm trust github @rimelabs/api --file release.yaml \
+  --repository rimelabs/rime-api --environment npm-release --allow-publish \
+  --registry=https://registry.npmjs.org
+```
+
+For PyPI, sign in and open <https://pypi.org/manage/account/publishing/>.
+Add a pending GitHub publisher for the new project `rime-api`, with owner
+`rimelabs`, repository `rime-api`, workflow `release.yaml`, and environment
+`pypi-release`. If the project already exists, add the publisher in its
+Publishing settings instead. A pending publisher does not reserve the name;
+the first successful upload creates the project.
+
+No npm or PyPI token is required in GitHub secrets. The workflow receives
+short-lived credentials through OIDC. npm publication uses Node.js 24 on a
+GitHub-hosted runner. npm provenance is enabled only when the source
+repository is public.
+
+See the [npm trusted publisher guide](https://docs.npmjs.com/trusted-publishers/)
+and [PyPI pending publisher guide](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/).
 
 ## Prepare a release
 
 1. Merge the required schema sync and package changes into `main`.
 2. Update `VERSION` in a PR. Use a `major.minor.patch` version.
-3. Run the checks and merge the version change:
-
-   ```shell
-   bazel test //tests/...
-   bash tools/check_compatibility.sh
-   bazel run //:format
-   uv run --no-project --python 3.13 python tools/check_release.py "v$(cat VERSION)"
-   ```
-
-4. Wait for all jobs in `Check packages` to pass on the release commit.
-   Download its `rime-api-dist` artifact and extract it into `dist/`.
-   Use that exact commit for the following commands.
+3. Run `bazel run //:format`, `bazel test //tests/...`, and
+   `bash tools/check_compatibility.sh`. Merge after all PR checks pass.
+4. Wait for every job in `Check packages` to pass on the commit in `main`.
+   Copy the run ID from its URL: `/actions/runs/<run_id>`.
 
 The build uses the committed schemas. A source repository update does not
 change a release until its Copybara PR is merged here. `SOURCE.json` records
-the release version and SHA-256 hashes of both definitions. The source
-revision is in the schema sync commit's `GitOrigin-RevId` trailer.
+the version and SHA-256 hashes of both definitions. The source revision is
+in the schema sync commit's `GitOrigin-RevId` trailer.
 
-## Test local archives
+## Publish from GitHub
 
-These commands can also check an archive before publication:
+1. Open this repository's **Actions** tab and select **Release packages**.
+2. Select **Run workflow**. Leave the branch as `main`.
+3. Enter the successful `Check packages` run ID and its version.
+4. Select `npm`, `pypi`, or `both`, then start the workflow.
+
+For the first release, use run `34162808003` and version `0.0.1`.
+That run tested commit `41029e4a2cbdd3f1146d0def0abe1c9bde8bd806`.
+Its npm archive is already published. Select `pypi` after the PyPI publisher
+is configured, or `both` to also verify the existing npm publication.
+
+The workflow checks the source repository, branch, workflow, commit,
+version, job results, artifact checksum, package metadata, and schemas.
+It downloads the selected run's `rime-api-dist` artifact; it does not rebuild.
+The selected commit must be an ancestor of the workflow commit on `main`.
+Expired artifacts cannot be used.
+
+Before publication, it compares any existing registry files with the tested
+archives. Identical files are skipped. Different contents for the same
+version stop the release. After publication, the workflow downloads the
+registry files, checks their contents, and tests Python imports and message
+serialization, plus JavaScript ESM, CommonJS, and TypeScript use.
+
+The run retains the archives and a `RELEASE.json` record in its `release-dist`
+artifact for 90 days. The record includes the source commit, test run,
+original artifact identity, and archive checksums.
+
+If one upload or installation check fails, correct the cause and start the
+workflow again with the **same run ID and version**. Select only the failed
+registry if the other has passed. uv skips identical Python files if an
+upload stopped between the wheel and source archive. Do not build different
+contents under an existing version.
+
+After both registry jobs pass, tag the **selected release commit**:
 
 ```shell
-version=$(cat VERSION)
-uv run --isolated --no-project --python 3.10 \
-  --with "./dist/rime_api-$version-py3-none-any.whl" \
-  --with protobuf==6.33.5 \
-  python tests/packages_test.py --fixtures tests/fixtures.json
-uv run --isolated --no-project --python 3.14 \
-  --with "./dist/rime_api-$version.tar.gz" \
-  --with protobuf==7.36.1 \
-  python tests/packages_test.py --fixtures tests/fixtures.json
-bash tests/test_installed_javascript.sh "dist/rime-api-$version.tgz"
+version=0.0.1
+release_commit=41029e4a2cbdd3f1146d0def0abe1c9bde8bd806
+git tag -a "v$version" "$release_commit" -m "Rime API $version"
+git push origin "v$version"
 ```
 
-## Publish
+Replace both values for each later release. Do not tag the workflow commit
+unless it is also the selected release commit.
 
-Rime must control the PyPI name `rime-api` and npm scope `@rimelabs` before the
-first release. Set `UV_PUBLISH_TOKEN` through your secret manager and use
-`npm login --registry=https://registry.npmjs.org` with an account that can
-publish `@rimelabs/api`.
+## Manual publication if needed
 
-Publish the tested archives from the selected CI run:
+Download the selected successful run's `rime-api-dist` artifact into `dist/`.
+Use a PyPI token from your secret manager through `UV_PUBLISH_TOKEN`, and an
+npm account with package write access and 2FA:
 
 ```shell
-version=$(cat VERSION)
-uv run --no-project --python 3.13 python tools/check_release.py "v$version"
+version=0.0.1
 uv publish --trusted-publishing never \
   "dist/rime_api-$version-py3-none-any.whl" \
   "dist/rime_api-$version.tar.gz"
@@ -62,20 +122,9 @@ npm publish "./dist/rime-api-$version.tgz" --access public \
   --@rimelabs:registry=https://registry.npmjs.org
 ```
 
-The scope-specific registry option overrides an existing GitHub Packages
-setting for `@rimelabs` for this command. It does not change the registry
-settings used to install the internal UI package.
-
-After both registries accept the version, tag the release commit:
-
-```shell
-git tag -a "v$version" -m "Rime API $version"
-git push origin "v$version"
-```
-
-If one registry fails, publish the same tested version to the missing registry.
-Do not rebuild different contents under a version that already exists. Restore
-both registries before starting the next release.
+The scope-specific npm option overrides the GitHub Packages setting used for
+the internal UI package for this command. Test installation from the registries
+before you create the tag.
 
 ## Compatibility
 
