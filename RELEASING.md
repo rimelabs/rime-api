@@ -28,8 +28,7 @@ also configure this from the terminal:
 ```shell
 npm trust github @rimelabs/api --file release.yaml \
   --repository rimelabs/rime-api --environment npm-release --allow-publish \
-  --registry=https://registry.npmjs.org \
-  --@rimelabs:registry=https://registry.npmjs.org
+  --registry=https://registry.npmjs.org
 ```
 
 For PyPI, sign in and open <https://pypi.org/manage/account/publishing/>.
