@@ -67,10 +67,12 @@ in the schema sync commit's `GitOrigin-RevId` trailer.
 3. Enter the successful `Check packages` run ID and its version.
 4. Select `npm`, `pypi`, or `both`, then start the workflow.
 
-For the first release, use run `34162808003` and version `0.0.1`.
-That run tested commit `41029e4a2cbdd3f1146d0def0abe1c9bde8bd806`.
-Its npm archive is already published. Select `pypi` after the PyPI publisher
-is configured, or `both` to also verify the existing npm publication.
+Version `0.0.1` is published to both registries and tagged as `v0.0.1`.
+Its archives came from run `34162808003`, which tested commit
+`41029e4a2cbdd3f1146d0def0abe1c9bde8bd806`. The release workflow verified
+[npm](https://github.com/rimelabs/rime-api/actions/runs/34165338107) and
+[PyPI](https://github.com/rimelabs/rime-api/actions/runs/34168990251).
+To repeat verification, select that original run, version `0.0.1`, and `both`.
 
 The workflow checks the source repository, branch, workflow, commit,
 version, job results, artifact checksum, package metadata, and schemas.
