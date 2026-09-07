@@ -57,8 +57,14 @@ uv run --no-project --python 3.13 python tools/check_release.py "v$version"
 uv publish --trusted-publishing never \
   "dist/rime_api-$version-py3-none-any.whl" \
   "dist/rime_api-$version.tar.gz"
-npm publish "dist/rime-api-$version.tgz" --access public --registry=https://registry.npmjs.org
+npm publish "./dist/rime-api-$version.tgz" --access public \
+  --registry=https://registry.npmjs.org \
+  --@rimelabs:registry=https://registry.npmjs.org
 ```
+
+The scope-specific registry option overrides an existing GitHub Packages
+setting for `@rimelabs` for this command. It does not change the registry
+settings used to install the internal UI package.
 
 After both registries accept the version, tag the release commit:
 
