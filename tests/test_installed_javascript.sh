@@ -18,9 +18,9 @@ cat >smoke.mjs <<'JS'
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import * as esm from '@rime/api';
+import * as esm from '@rimelabs/api';
 import { fromBinary, fromJson, toBinary, toJson } from '@bufbuild/protobuf';
-const commonjs = createRequire(import.meta.url)('@rime/api');
+const commonjs = createRequire(import.meta.url)('@rimelabs/api');
 for (const definitions of [esm, commonjs]) {
   for (const fixture of JSON.parse(readFileSync('fixtures.json', 'utf8'))) {
     const schema = definitions[`${fixture.message}Schema`];
@@ -32,8 +32,8 @@ JS
 node smoke.mjs
 cat >consumer.mts <<'TS'
 import { create } from '@bufbuild/protobuf';
-import { WebSocketRequestSchema } from '@rime/api';
-import type { WebSocketRequest } from '@rime/api';
+import { WebSocketRequestSchema } from '@rimelabs/api';
+import type { WebSocketRequest } from '@rimelabs/api';
 const request: WebSocketRequest = create(WebSocketRequestSchema, {
   contextId: 'test', payload: { case: 'text', value: 'Hello.' },
 });

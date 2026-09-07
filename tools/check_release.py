@@ -14,7 +14,7 @@ if sys.argv[1:] != [f"v{version}"]:
     raise SystemExit(f"Release tag must be v{version}")
 python = tomllib.loads((repository / "packages/python.toml").read_text())
 javascript = json.loads((repository / "packages/javascript.json").read_text())
-for metadata, name in [(python["project"], "rime-api"), (javascript, "@rime/api")]:
+for metadata, name in [(python["project"], "rime-api"), (javascript, "@rimelabs/api")]:
     if metadata["name"] != name or metadata["version"] != "@VERSION@":
         raise SystemExit(f"Unexpected package name or version template for {name}")
     if metadata["license"] != "Apache-2.0":

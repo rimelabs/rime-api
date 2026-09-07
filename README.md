@@ -19,7 +19,7 @@ After publication, install them with:
 
 ```shell
 uv add rime-api
-npm install @rime/api @bufbuild/protobuf@^2.11.0
+npm install @rimelabs/api @bufbuild/protobuf@^2.11.0
 ```
 
 ```python
@@ -31,7 +31,7 @@ encoded = request.SerializeToString()
 
 ```typescript
 import { create, toBinary } from "@bufbuild/protobuf";
-import { WebSocketRequestSchema } from "@rime/api";
+import { WebSocketRequestSchema } from "@rimelabs/api";
 
 const request = create(WebSocketRequestSchema, {
   contextId: "turn-42",

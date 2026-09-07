@@ -1,6 +1,6 @@
 # Release packages
 
-Python `rime-api` and npm `@rime/api` share the version in `VERSION`.
+Python `rime-api` and npm `@rimelabs/api` share the version in `VERSION`.
 Package publication is manual. CI builds and tests archives but does not publish.
 
 ## Prepare a release
@@ -44,9 +44,10 @@ bash tests/test_installed_javascript.sh "dist/rime-api-$version.tgz"
 
 ## Publish
 
-Rime must control the PyPI name `rime-api` and npm scope `@rime` before the
+Rime must control the PyPI name `rime-api` and npm scope `@rimelabs` before the
 first release. Set `UV_PUBLISH_TOKEN` through your secret manager and use
-`npm login` with an account that can publish `@rime/api`.
+`npm login --registry=https://registry.npmjs.org` with an account that can
+publish `@rimelabs/api`.
 
 Publish the tested archives from the selected CI run:
 
@@ -56,7 +57,7 @@ uv run --no-project --python 3.13 python tools/check_release.py "v$version"
 uv publish --trusted-publishing never \
   "dist/rime_api-$version-py3-none-any.whl" \
   "dist/rime_api-$version.tar.gz"
-npm publish "dist/rime-api-$version.tgz" --access public
+npm publish "dist/rime-api-$version.tgz" --access public --registry=https://registry.npmjs.org
 ```
 
 After both registries accept the version, tag the release commit:

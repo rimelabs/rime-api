@@ -1,5 +1,5 @@
 {
-  "name": "@rime/api",
+  "name": "@rimelabs/api",
   "version": "@VERSION@",
   "description": "Generated protocol definitions for Rime text-to-speech",
   "type": "module",
@@ -25,6 +25,7 @@
     "@bufbuild/protobuf": "^2.11.0"
   },
   "publishConfig": {
+    "registry": "https://registry.npmjs.org",
     "access": "public"
   },
   "license": "Apache-2.0"

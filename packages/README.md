@@ -22,13 +22,13 @@ runtime dependency is `protobuf`. It does not require gRPC.
 ## JavaScript and TypeScript
 
 ```shell
-npm install @rime/api @bufbuild/protobuf@^2.11.0
+npm install @rimelabs/api @bufbuild/protobuf@^2.11.0
 ```
 
 ```typescript
 import { create, toBinary } from "@bufbuild/protobuf";
-import { WebSocketRequestSchema } from "@rime/api";
-import type { WebSocketRequest } from "@rime/api";
+import { WebSocketRequestSchema } from "@rimelabs/api";
+import type { WebSocketRequest } from "@rimelabs/api";
 
 const request: WebSocketRequest = create(WebSocketRequestSchema, {
   contextId: "turn-42",
