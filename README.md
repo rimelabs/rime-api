@@ -14,7 +14,8 @@ versioning, and publication. See [schema sync](sync/README.md).
 
 ## Packages
 
-The first release is prepared as `0.0.1`. The packages are not yet published.
+The npm package is available as `@rimelabs/api@0.0.1`.
+The Python package `rime-api` is prepared as `0.0.1` but is not yet published.
 After publication, install them with:
 
 ```shell

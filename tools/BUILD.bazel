@@ -1,6 +1,13 @@
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun")
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+py_library(
+    name = "release",
+    srcs = ["release.py"],
+    visibility = ["//visibility:public"],
+)
 
 py_binary(
     name = "build_packages",

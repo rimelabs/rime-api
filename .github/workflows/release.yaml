@@ -1,0 +1,138 @@
+name: Release packages
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Check packages run ID from main
+        required: true
+        type: string
+      version:
+        description: Package version, such as 0.0.1
+        required: true
+        type: string
+      registry:
+        description: Registry to publish
+        required: true
+        type: choice
+        default: npm
+        options: [npm, pypi, both]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release-packages
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - name: Verify and download tested archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ inputs.run_id }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py prepare \
+            --run-id "$RELEASE_RUN_ID" --version "$RELEASE_VERSION" --directory release-dist
+      - name: Check existing registry versions
+        env:
+          RELEASE_REGISTRY: ${{ inputs.registry }}
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry "$RELEASE_REGISTRY" --directory release-dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-dist
+          path: release-dist/
+          retention-days: 90
+  npm:
+    needs: prepare
+    if: inputs.registry == 'npm' || inputs.registry == 'both'
+    runs-on: ubuntu-latest
+    environment: npm-release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: release-dist/
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Check whether npm needs publication
+        id: existing
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry npm --directory release-dist >> "$GITHUB_OUTPUT"
+      - name: Publish to npm with Trusted Publishing
+        if: steps.existing.outputs.npm_publish_required == 'true'
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          # npm provenance is unavailable for private source repositories.
+          NPM_CONFIG_PROVENANCE: ${{ !github.event.repository.private }}
+        run: |
+          npm publish "./release-dist/rime-api-$RELEASE_VERSION.tgz" --access public \
+            --registry=https://registry.npmjs.org \
+            --@rimelabs:registry=https://registry.npmjs.org
+      - name: Download and verify the published npm archive
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry npm --directory release-dist --download "$RUNNER_TEMP/npm-release"
+      - name: Test installation from npm
+        run: bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz
+  pypi:
+    needs: prepare
+    if: inputs.registry == 'pypi' || inputs.registry == 'both'
+    runs-on: ubuntu-latest
+    environment: pypi-release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: release-dist/
+      - uses: astral-sh/setup-uv@v7
+      - name: Check whether PyPI needs publication
+        id: existing
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry pypi --directory release-dist >> "$GITHUB_OUTPUT"
+      - name: Publish to PyPI with Trusted Publishing
+        if: steps.existing.outputs.pypi_publish_required == 'true'
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          uv publish --trusted-publishing always \
+            "release-dist/rime_api-$RELEASE_VERSION-py3-none-any.whl" \
+            "release-dist/rime_api-$RELEASE_VERSION.tar.gz"
+      - name: Download and verify the published Python archives
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry pypi --directory release-dist --download "$RUNNER_TEMP/pypi-release"
+      - name: Test installation from PyPI
+        run: |
+          for distribution in "$RUNNER_TEMP/pypi-release/"*; do
+            uv run --isolated --no-project --python 3.13 --with "$distribution" \
+              python tests/packages_test.py --fixtures tests/fixtures.json
+          done
