@@ -1,0 +1,30 @@
+load("@aspect_rules_lint//format:defs.bzl", "format_multirun")
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+
+py_binary(
+    name = "build_packages",
+    srcs = ["build_packages.py"],
+    legacy_create_init = 0,
+    visibility = ["//visibility:public"],
+    deps = [
+        "@pip//grpcio_tools",
+        "@pip//hatchling",
+    ],
+)
+
+java_binary(
+    name = "copybara",
+    main_class = "com.google.copybara.Main",
+    visibility = ["//visibility:public"],
+    runtime_deps = ["@copybara_release//jar"],
+)
+
+format_multirun(
+    name = "format",
+    python = "@aspect_rules_lint//format:ruff",
+    shell = "@aspect_rules_lint//format:shfmt",
+    starlark = "@buildifier_prebuilt//:buildifier",
+    visibility = ["//visibility:public"],
+    yaml = "@aspect_rules_lint//format:yamlfmt",
+)

@@ -1,0 +1,65 @@
+module(name = "rime_api")
+
+bazel_dep(name = "aspect_rules_js", version = "3.4.0")
+
+bazel_dep(name = "aspect_rules_lint", version = "2.3.0", dev_dependency = True)
+bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.3", dev_dependency = True)
+
+bazel_dep(name = "protobuf", version = "35.0")
+
+bazel_dep(name = "rules_buf", version = "0.5.2", dev_dependency = True)
+
+bazel_dep(name = "rules_java", version = "9.3.0")
+bazel_dep(name = "rules_nodejs", version = "6.7.3")
+bazel_dep(name = "rules_python", version = "2.3.2")
+
+# Older re2 releases use native rules removed in Bazel 9.
+single_version_override(
+    module_name = "re2",
+    version = "2025-11-05.bcr.1",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.defaults(python_version = "3.13")
+python.toolchain(python_version = "3.13")
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.13",
+    requirements_lock = "//:requirements.txt",
+)
+use_repo(pip, "pip")
+
+node = use_extension("@rules_nodejs//nodejs:extensions.bzl", "node")
+node.toolchain(node_version = "24.13.0")
+
+pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm.pnpm(
+    name = "pnpm",
+    pnpm_version = "11.22.0",
+    pnpm_version_integrity = "sha512-H/hwxMYTPf2I+yr8Rt0T1H8JyXlLQ4xv20fKmMrzvBY4HuC+k6CRuOOCTPAfiJ9G19niCRD7C+GrD7W6qA3WIQ==",
+)
+use_repo(pnpm, "pnpm")
+
+npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
+npm.npm_translate_lock(
+    name = "npm",
+    pnpm_lock = "//:pnpm-lock.yaml",
+)
+use_repo(npm, "npm")
+
+buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")
+buf.toolchains(
+    sha256 = "aa8395890a724eeb952f06fbfb16723a03b4e7a66c6cd6ac9a63e25bf2d254bf",
+    version = "v1.64.0",
+)
+use_repo(buf, "rules_buf_toolchains")
+
+http_jar = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
+
+http_jar(
+    name = "copybara_release",
+    sha256 = "4499e9cd0c07cfc9b82c3af644b7b95c1787eea980f99c1515515774c1307d64",
+    urls = ["https://github.com/google/copybara/releases/download/v20260907/copybara_deploy.jar"],
+)

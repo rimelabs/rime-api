@@ -1,0 +1,3 @@
+build --nostamp
+build --java_runtime_version=remotejdk_25
+test --test_output=errors

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rime-api"
+version = "@VERSION@"
+description = "Generated protocol definitions for Rime text-to-speech"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "Rime" }]
+dependencies = ["protobuf>=6.33.5,<8"]
+
+[project.urls]
+Documentation = "https://docs.rime.ai"
+Repository = "https://github.com/rimelabs/rime-api"
+Issues = "https://github.com/rimelabs/rime-api/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rime_api"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"SOURCE.json" = "rime_api/SOURCE.json"
+"schema" = "rime_api/schema"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "schema", "SOURCE.json", "pyproject.toml", "README.md", "LICENSE", "NOTICE"]

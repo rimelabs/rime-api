@@ -1,0 +1,37 @@
+[
+  {
+    "message": "WebSocketRequest",
+    "json": { "contextId": "turn-42", "text": "hello" },
+    "hex": "0a077475726e2d3432220568656c6c6f"
+  },
+  {
+    "message": "WebSocketResponse",
+    "json": { "contextId": "turn-42", "audio": "AQI=" },
+    "hex": "0a077475726e2d343222020102"
+  },
+  {
+    "message": "WebSocketRequest",
+    "json": { "end": {} },
+    "hex": "2a00"
+  },
+  {
+    "message": "WebSocketRequest",
+    "json": { "cancel": {} },
+    "hex": "3200"
+  },
+  {
+    "message": "WebSocketResponse",
+    "json": { "ready": { "protocol": 1, "languages": ["en"] } },
+    "hex": "120608011202656e"
+  },
+  {
+    "message": "WebSocketRequest",
+    "json": {
+      "start": {
+        "audioParameters": { "samplingRate": 0 },
+        "splitStrategy": "SPLIT_STRATEGY_NONE"
+      }
+    },
+    "hex": "1a062a0210003002"
+  }
+]

@@ -1,0 +1,30 @@
+"""Export the public API from the authoritative Rime repository."""
+
+core.workflow(
+    name = "public_api",
+    origin = git.origin(
+        url = "https://github.com/rimelabs/rime.git",
+        ref = "main",
+    ),
+    destination = git.destination(
+        url = "https://github.com/rimelabs/rime-api.git",
+        fetch = "main",
+        push = "sync/public-api",
+        integrates = [],
+    ),
+    origin_files = glob([
+        "interfaces/rime/text_to_speech.proto",
+        "interfaces/text_to_speech.asyncapi.yaml",
+    ]),
+    destination_files = glob([
+        "schema/rime/text_to_speech.proto",
+        "schema/text_to_speech.asyncapi.yaml",
+    ]),
+    authoring = authoring.overwrite("Rime API Sync <noreply@rime.ai>"),
+    transformations = [
+        core.move("interfaces", "schema"),
+        metadata.replace_message("Sync public API definitions\n"),
+    ],
+    mode = "SQUASH",
+    check_last_rev_state = True,
+)

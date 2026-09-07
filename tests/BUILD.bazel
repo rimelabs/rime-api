@@ -1,0 +1,61 @@
+load("@aspect_rules_js//js:defs.bzl", "js_test")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+py_test(
+    name = "sync_workflow_test",
+    size = "small",
+    srcs = ["sync_workflow_test.py"],
+    args = ["$(rootpath //:.github/workflows/sync.yaml)"],
+    data = ["//:.github/workflows/sync.yaml"],
+    legacy_create_init = 0,
+)
+
+py_test(
+    name = "packages_test",
+    size = "small",
+    srcs = ["packages_test.py"],
+    args = [
+        "--packages",
+        "$(rootpath //:packages)",
+        "--fixtures",
+        "$(rootpath :fixtures.json)",
+    ],
+    data = [
+        "fixtures.json",
+        "//:packages",
+    ],
+    legacy_create_init = 0,
+    deps = ["@pip//protobuf"],
+)
+
+js_test(
+    name = "javascript_test",
+    size = "small",
+    args = [
+        "$(rootpath //:packages)",
+        "$(rootpath :fixtures.json)",
+    ],
+    data = [
+        "fixtures.json",
+        "//:node_modules/@bufbuild/protobuf",
+        "//:packages",
+    ],
+    entry_point = "javascript_test.mjs",
+)
+
+py_test(
+    name = "copybara_test",
+    size = "medium",
+    srcs = ["copybara_test.py"],
+    args = [
+        "--copybara",
+        "$(rootpath //tools:copybara)",
+        "--configuration",
+        "$(rootpath //:copy.bara.sky)",
+    ],
+    data = [
+        "//:copy.bara.sky",
+        "//tools:copybara",
+    ],
+    legacy_create_init = 0,
+)

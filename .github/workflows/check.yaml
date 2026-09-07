@@ -1,0 +1,90 @@
+name: Check packages
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-version: 1.x
+          repository-cache: true
+      - uses: astral-sh/setup-uv@v7
+      - name: Check Python dependency lock
+        run: |
+          uv lock --check
+          uv export --locked --format requirements-txt --no-emit-project --output-file /tmp/rime-api-requirements.txt
+          diff <(sed '/^#/d' requirements.txt) <(sed '/^#/d' /tmp/rime-api-requirements.txt)
+      - name: Check format
+        run: bazel run //:format_check
+      - name: Check schema compatibility
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash tools/check_compatibility.sh
+      - name: Build and test
+        run: |
+          bazel test //tests/...
+          mkdir -p dist
+          output=$(bazel cquery --output=files //:packages)
+          cp "$output"/dist/* dist/
+      - name: Check release metadata
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: uv run --no-project python tools/check_release.py "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rime-api-dist
+          path: dist/
+  python:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        protobuf: ['6.33.5', '7.36.1']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: rime-api-dist
+          path: dist/
+      - name: Test installed wheel and source distribution
+        env:
+          PYTHON_VERSION: ${{ matrix.python }}
+          PROTOBUF_VERSION: ${{ matrix.protobuf }}
+        run: |
+          for distribution in dist/*.whl dist/*.tar.gz; do
+            uv run --isolated --no-project --python "$PYTHON_VERSION" \
+              --with "$distribution" --with "protobuf==$PROTOBUF_VERSION" \
+              python tests/packages_test.py --fixtures tests/fixtures.json
+          done
+  javascript:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22', '24']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: rime-api-dist
+          path: dist/
+      - name: Test installed npm package
+        run: bash tests/test_installed_javascript.sh dist/*.tgz

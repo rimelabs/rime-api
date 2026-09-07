@@ -1,0 +1,461 @@
+# AsyncAPI description of the engine's WebSocket synthesis interface.
+#
+# This document describes the JSON (text-frame) encoding of the envelope
+# messages defined in `rime/text_to_speech.proto` (`WebSocketRequest` /
+# `WebSocketResponse`); the proto file is the source of truth. Payload field names follow the
+# canonical proto3 JSON mapping (camelCase, `bytes` as base64). Offering the
+# `rime.v1.binary` WebSocket subprotocol at upgrade switches server frames to
+# the protobuf binary encoding of the same envelopes.
+asyncapi: 3.0.0
+
+info:
+  title: Rime Streaming Synthesis WebSocket API
+  version: '1.0.0'
+  description: |
+    One WebSocket connection drives one or more *contexts*. A context is one
+    continuous synthesis: it is either one-shot (opened by a `start` whose
+    `text` is the whole input) or streaming (opened by a `start` with empty
+    `text`, then fed by `text` chunks and closed by `end`); either way the
+    audio is a single continuous stream. Prosody and Talker state carry across
+    `text` chunks within each bounded generation; long contexts may roll to a
+    fresh generation at a sentence boundary.
+
+    Per context the server emits `started`, then zero or more `audio`
+    payloads, then exactly one terminal event: `done`, `cancelled`, or
+    `error`. Multiple contexts may be open concurrently on one connection;
+    every frame carries the `contextId` it applies to. An identifier may be
+    reused after its context reaches a terminal event.
+
+    ### Framing
+
+    Every WebSocket message carries exactly one envelope message:
+
+    - text frames: canonical proto3 JSON encoding of the envelope
+    - binary frames: protobuf binary encoding of the envelope
+
+    Client frames are decoded according to their frame type. The response
+    encoding is fixed at upgrade time by the WebSocket subprotocol: the first
+    recognized entry in the client's offer list wins — `rime.v1.binary`
+    selects binary frames, `rime.v1.json` selects JSON text frames — and the
+    server echoes the selected subprotocol. Offering no subprotocol selects
+    JSON. Offering only unrecognized values also selects JSON but echoes no
+    subprotocol, which spec-compliant clients (RFC 6455 section 4.1; all
+    browsers) treat as a failed handshake — offer one of the values above,
+    or none.
+
+    ### Connection lifecycle
+
+    The server sends `ready` once per connection when the engine can
+    synthesize (pipelines loaded and serving); gate `start` on this event.
+    Errors with an empty `contextId` are connection-scoped and leave open
+    contexts running; the server closes the connection only when the failure
+    is unrecoverable (undecodable frames, failed authentication).
+
+    ### Authentication
+
+    Preferred is an `Authorization` header on the upgrade request (rejected
+    with HTTP 401 before the socket opens). Browsers cannot set WebSocket
+    headers; they send `config.authorization` (or `config.license`) as the
+    first message instead. Debug builds skip auth.
+
+servers:
+  engine:
+    host: '{host}'
+    pathname: /ws
+    protocol: ws
+    description: >-
+      Served at `GET /ws` on the engine's HTTP port (the same port as
+      `/invocations`).
+    variables:
+      host:
+        description: Engine HTTP host and port.
+        default: 'localhost:8080'
+
+channels:
+  synthesis:
+    address: /ws
+    description: >-
+      The single bidirectional channel. Client envelopes select their action
+      via the request oneof; server envelopes report events via the response
+      oneof.
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Authorization:
+              type: string
+              description: >-
+                Optional, e.g. "Api-Key <key>". Rejected with HTTP 401 before
+                the socket opens if invalid.
+            Sec-WebSocket-Protocol:
+              type: string
+              description: >-
+                Optional response-encoding selector; the first recognized
+                entry in the offer list wins: `rime.v1.binary` for protobuf
+                binary frames, `rime.v1.json` for JSON text frames (also the
+                default with no subprotocol). The server echoes the selected
+                value. Unrecognized-only offers get JSON with no echoed
+                subprotocol, which spec-compliant clients treat as a failed
+                handshake — offer one of the two values, or none.
+    messages:
+      config:
+        $ref: '#/components/messages/config'
+      start:
+        $ref: '#/components/messages/start'
+      text:
+        $ref: '#/components/messages/text'
+      end:
+        $ref: '#/components/messages/end'
+      cancel:
+        $ref: '#/components/messages/cancel'
+      ready:
+        $ref: '#/components/messages/ready'
+      started:
+        $ref: '#/components/messages/started'
+      audio:
+        $ref: '#/components/messages/audio'
+      done:
+        $ref: '#/components/messages/done'
+      cancelled:
+        $ref: '#/components/messages/cancelled'
+      error:
+        $ref: '#/components/messages/error'
+
+operations:
+  # Operation actions are from the perspective of the described application
+  # (the engine): it receives request envelopes and sends response envelopes.
+  receiveRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/synthesis'
+    summary: Client -> server envelope (proto `WebSocketRequest`).
+    messages:
+      - $ref: '#/channels/synthesis/messages/config'
+      - $ref: '#/channels/synthesis/messages/start'
+      - $ref: '#/channels/synthesis/messages/text'
+      - $ref: '#/channels/synthesis/messages/end'
+      - $ref: '#/channels/synthesis/messages/cancel'
+  sendResponse:
+    action: send
+    channel:
+      $ref: '#/channels/synthesis'
+    summary: Server -> client envelope (proto `WebSocketResponse`).
+    messages:
+      - $ref: '#/channels/synthesis/messages/ready'
+      - $ref: '#/channels/synthesis/messages/started'
+      - $ref: '#/channels/synthesis/messages/audio'
+      - $ref: '#/channels/synthesis/messages/done'
+      - $ref: '#/channels/synthesis/messages/cancelled'
+      - $ref: '#/channels/synthesis/messages/error'
+
+components:
+  messages:
+    config:
+      name: config
+      title: Connection configuration
+      summary: >-
+        At most one per connection, and only before the first `start`. Not
+        required in debug mode or when the upgrade request carried an
+        `Authorization` header.
+      payload:
+        type: object
+        required: [config]
+        properties:
+          config:
+            type: object
+            properties:
+              authorization:
+                type: string
+                description: >-
+                  Mirrors the HTTP `Authorization` header, e.g. "Api-Key
+                  <key>". Rejected if the upgrade request already carried an
+                  Authorization header.
+              license:
+                type: string
+                description: >-
+                  License JSON for on-prem deployments; mirrors the
+                  `x-rime-license` gRPC metadata / the `license` field of the
+                  HTTP API.
+              defaults:
+                allOf:
+                  - $ref: '#/components/schemas/synthesisRequest'
+                description: >-
+                  Defaults merged (field-wise, shallow) under every subsequent
+                  `start`. Its `text` field is ignored.
+
+    start:
+      name: start
+      title: Open a context
+      summary: >-
+        Opens the context with the full synthesis parameters. A non-empty
+        `text` is the complete input for one-shot synthesis: audio streams and
+        ends with `done`, no `end` required. An empty `text` opens a streaming
+        context that stays open for `text` messages and finalizes on `end`.
+      payload:
+        type: object
+        required: [start]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          start:
+            $ref: '#/components/schemas/synthesisRequest'
+
+    text:
+      name: text
+      title: Append input text
+      summary: >-
+        Appends one complete sentence to an open streaming context (one opened
+        with an empty `start.text`). The engine meters, normalizes, and
+        synthesizes it into the same continuous audio as it arrives. Rejected
+        with kind "invalid_input" if the context is not open for input (no
+        `start`, or already `end`ed / one-shot).
+      payload:
+        type: object
+        required: [text]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          text:
+            type: string
+
+    end:
+      name: end
+      title: End of input
+      summary: >-
+        Declares end of input for a streaming context. Remaining audio is
+        delivered, followed by `done`. A no-op for a one-shot context. The
+        connection stays open for further contexts.
+      payload:
+        type: object
+        required: [end]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          end:
+            type: object
+
+    cancel:
+      name: cancel
+      title: Cancel a context
+      summary: >-
+        Aborts the context immediately, discarding in-flight synthesis.
+        Acknowledged with `cancelled`; idempotent (cancelling an unknown or
+        finished context is not an error).
+      payload:
+        type: object
+        required: [cancel]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          cancel:
+            type: object
+
+    ready:
+      name: ready
+      title: Engine ready
+      summary: >-
+        Sent once per connection when the engine is ready to synthesize
+        (pipelines loaded and serving). Gate `start` on this event.
+        Connection-scoped: carries no `contextId`.
+      payload:
+        type: object
+        required: [ready]
+        properties:
+          ready:
+            type: object
+            properties:
+              protocol:
+                type: integer
+                description: Protocol version. Currently 1.
+              languages:
+                type: array
+                items:
+                  type: string
+                description: >-
+                  Supported BCP-47 language tags (mirrors
+                  GetSupportedLanguages).
+              defaultLanguage:
+                type: string
+
+    started:
+      name: started
+      title: Context accepted
+      summary: The context was accepted; precedes any of its audio.
+      payload:
+        type: object
+        required: [started]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          started:
+            type: object
+            properties:
+              requestId:
+                type: string
+                description: >-
+                  Engine request id for this context; correlates with engine
+                  logs and matches the `x-request-id` gRPC/HTTP metadata.
+
+    audio:
+      name: audio
+      title: Audio chunk
+      summary: >-
+        A chunk of encoded audio, in the format requested at `start`
+        (`audioParameters.audioFormat`). Chunks concatenate into one
+        continuous stream per context.
+      payload:
+        type: object
+        required: [audio]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          audio:
+            type: string
+            format: byte
+            description: >-
+              Base64 in JSON frames (proto3 JSON mapping of `bytes`); raw
+              bytes in binary frames.
+
+    done:
+      name: done
+      title: Context finished
+      summary: 'Terminal: all audio for the context has been delivered.'
+      payload:
+        type: object
+        required: [done]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          done:
+            type: object
+
+    cancelled:
+      name: cancelled
+      title: Context cancelled
+      summary: 'Terminal: the context was aborted by `cancel`.'
+      payload:
+        type: object
+        required: [cancelled]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          cancelled:
+            type: object
+
+    error:
+      name: error
+      title: Error
+      summary: >-
+        Terminal for the context it names. Errors with an empty `contextId`
+        are connection-scoped and leave open contexts running; the server
+        closes the connection only when the failure is unrecoverable
+        (undecodable frames, failed authentication).
+      payload:
+        type: object
+        required: [error]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          error:
+            type: object
+            properties:
+              kind:
+                type: string
+                description: >-
+                  Stable machine-readable kind; same values as the HTTP error
+                  body (e.g. "invalid_input", "unauthenticated",
+                  "unavailable", "internal", "unimplemented").
+              message:
+                type: string
+                description: Human-readable description.
+              requestId:
+                type: string
+                description: >-
+                  Engine request id, when the error occurred inside a
+                  synthesis request.
+
+  schemas:
+    contextId:
+      type: string
+      maxLength: 128
+      description: >-
+        Client-chosen context identifier, at most 128 bytes. Empty selects the
+        context named "default". Server frames echo the context they apply
+        to; empty on connection-scoped payloads (`ready` and connection-level
+        `error`s).
+
+    synthesisRequest:
+      type: object
+      description: >-
+        Proto3 JSON encoding of `rime.SynthesisRequest` (the same message the
+        gRPC `Synthesize`/`SynthesizeStreaming` RPCs take).
+      properties:
+        language:
+          type: string
+          description: BCP-47 language tag, e.g. "en".
+        speaker:
+          type: string
+          description: Speaker name, e.g. "luna".
+        text:
+          type: string
+          description: >-
+            One-shot input text; empty (or absent) opens a streaming context.
+        audioParameters:
+          type: object
+          properties:
+            audioFormat:
+              type: string
+              description: >-
+                Requested audio MIME type, e.g. "audio/wav", "audio/mpeg",
+                "audio/ogg;codecs=opus", "audio/pcm", "audio/webm;codecs=opus".
+            samplingRate:
+              type: integer
+            timeScaleFactor:
+              type: number
+        splitStrategy:
+          type: string
+          enum:
+            - SPLIT_STRATEGY_UNSPECIFIED
+            - SPLIT_STRATEGY_SENTENCE
+            - SPLIT_STRATEGY_NONE
+          description: >-
+            Controls how input text is split before synthesis. Defaults to
+            SPLIT_STRATEGY_SENTENCE when unset.
+        arcanaParameters:
+          type: object
+          properties:
+            repetitionPenalty: {type: number}
+            topP: {type: number}
+            temperature: {type: number}
+            maxTokens: {type: integer}
+            presencePenalty: {type: number}
+            frequencyPenalty: {type: number}
+            topK: {type: integer}
+            minP: {type: number}
+            seed:
+              type: string
+              description: int64; a string in proto3 JSON.
+            minTokens: {type: integer}
+            detokenize: {type: boolean}
+            skipSpecialTokens: {type: boolean}
+            spacesBetweenSpecialTokens: {type: boolean}
+        codaParameters:
+          type: object
+          properties:
+            textLookaheadTokens:
+              type: integer
+              description: >-
+                Streaming text input only: number of leading text tokens
+                prefilled as a lookahead block before generation starts.
+                Defaults to 0. Ignored for one-shot synthesis.
+        mistParameters:
+          type: object
+          properties:
+            pauseBetweenBrackets: {type: boolean}
+            phonemizeBetweenBrackets: {type: boolean}
+            inlineTimeScaleFactors:
+              type: array
+              items: {type: number}
+            saveOovs: {type: boolean}

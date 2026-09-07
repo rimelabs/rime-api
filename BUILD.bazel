@@ -1,0 +1,43 @@
+load("@npm//:@bufbuild/protoc-gen-es/package_json.bzl", protoc_gen_es = "bin")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("//packages:packages.bzl", "api_packages")
+
+npm_link_all_packages(name = "node_modules")
+
+protoc_gen_es.protoc_gen_es_binary(name = "protoc_gen_es")
+
+exports_files([
+    ".github/workflows/sync.yaml",
+    "LICENSE",
+    "NOTICE",
+    "VERSION",
+    "copy.bara.sky",
+])
+
+api_packages(
+    name = "packages",
+    asyncapi = "//schema:text_to_speech.asyncapi.yaml",
+    license_files = [
+        "LICENSE",
+        "NOTICE",
+    ],
+    plugin = ":protoc_gen_es",
+    proto = "//schema/rime:text_to_speech_proto",
+    templates = [
+        "//packages:README.md",
+        "//packages:python.toml",
+        "//packages:javascript.json",
+    ],
+    version = "VERSION",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "format",
+    actual = "//tools:format",
+)
+
+alias(
+    name = "format_check",
+    actual = "//tools:format.check",
+)

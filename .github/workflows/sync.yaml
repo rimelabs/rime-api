@@ -1,0 +1,80 @@
+name: Sync public API
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: sync-public-api
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RIME_API_SYNC_TOKEN }}
+    steps:
+      - name: Check sync credential
+        run: test -n "$GH_TOKEN" || { echo 'Set the RIME_API_SYNC_TOKEN repository secret.'; exit 1; }
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-version: 1.x
+          repository-cache: true
+      - name: Configure Git credentials
+        run: gh auth setup-git
+      - name: Export schemas with Copybara
+        id: export
+        run: |
+          arguments=()
+          if [[ -z $(git log -1 --format=%H --grep='^GitOrigin-RevId: ') ]]; then
+            arguments+=("--last-rev=$(cat sync/INITIAL_REVISION)")
+          fi
+          status=0
+          bazel run //tools:copybara -- migrate "$PWD/copy.bara.sky" public_api \
+            --git-committer-name='Rime API Sync' \
+            --git-committer-email=noreply@rime.ai \
+            --git-destination-non-fast-forward "${arguments[@]}" || status=$?
+          # Copybara returns 4 when the selected source files have no changes.
+          if [[ "$status" != 0 && "$status" != 4 ]]; then
+            exit "$status"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+      - name: Close the stale schema PR
+        if: steps.export.outputs.status == '4'
+        run: |
+          pull_requests=$(gh pr list --head sync/public-api --base main --state open --json number --jq '.[].number')
+          for pull_request in $pull_requests; do
+            gh pr close "$pull_request"
+          done
+          # An empty result means the branch is absent. Access errors must fail.
+          remote_branch=$(git ls-remote --heads origin refs/heads/sync/public-api)
+          if [[ -n "$remote_branch" ]]; then
+            git push origin --delete sync/public-api
+          fi
+      - name: Open or retain the schema PR
+        if: steps.export.outputs.status == '0'
+        run: |
+          if ! git ls-remote --exit-code --heads origin sync/public-api; then
+            exit 0
+          fi
+          git fetch origin sync/public-api
+          if git diff --quiet origin/main FETCH_HEAD -- schema; then
+            exit 0
+          fi
+          existing=$(gh pr list --head sync/public-api --base main --state open --json number --jq 'length')
+          if [[ "$existing" == 0 ]]; then
+            cat > /tmp/rime-api-sync-pr.md <<'BODY'
+          Update the public Protobuf and AsyncAPI definitions from `rimelabs/rime`.
+
+          Copybara records the source revision in the commit. Package tests and
+          compatibility checks must pass before merge. Package publication is separate.
+          BODY
+            gh pr create --head sync/public-api --base main \
+              --title 'Sync public API definitions' --body-file /tmp/rime-api-sync-pr.md
+          fi

@@ -1,0 +1,88 @@
+# Schema sync
+
+The authoritative definitions remain in `rimelabs/rime` on `main`.
+Change schemas there, then use Copybara to export them here.
+
+| Source in `rime` | Destination in `rime-api` |
+| --- | --- |
+| `interfaces/rime/text_to_speech.proto` | `schema/rime/text_to_speech.proto` |
+| `interfaces/text_to_speech.asyncapi.yaml` | `schema/text_to_speech.asyncapi.yaml` |
+
+[copy.bara.sky](../copy.bara.sky) lists those exact files. It does not export
+the internal model protocol or other files added under `interfaces`.
+Build rules, package metadata, tests, and release tooling belong to this
+repository and are outside Copybara's destination file list.
+
+Copybara creates a commit on `sync/public-api`. The workflow opens a PR against
+`main`. The commit records `GitOrigin-RevId` and uses a fixed public message
+and author. It does not copy private commit descriptions or author addresses.
+Merge the sync PR with its revision trailer intact. A merge commit or a
+fast-forward preserves it. If you squash, retain the trailer in the result.
+
+## Initial source revision
+
+[INITIAL_REVISION](INITIAL_REVISION) identifies the `rime/main` commit used
+for the initial schema files. They are exact copies of that commit. This
+baseline lets the first sync proceed before there is a Copybara commit here.
+Keep the file as the bootstrap record; later syncs use commit trailers.
+
+The initial snapshot does not depend on the `nastassy/rime-protos` branch or
+its PR. It does not include that PR's Arcana deprecation annotations.
+
+## Configure the workflow
+
+After the initial repository commit is pushed to `main`, set the repository
+secret `RIME_API_SYNC_TOKEN` to a dedicated GitHub token that can read
+`rimelabs/rime` and push branches and open PRs in `rimelabs/rime-api`.
+Use a dedicated credential, since the normal workflow token cannot read
+the private source repository. A token distinct from `GITHUB_TOKEN` also
+allows the resulting PR to trigger package CI.
+
+Enable Actions and run `Sync public API` once. It also runs each day. Only
+the workflow on `main` uses the sync credential. Normal PR checks need no
+access to the private repository.
+
+The workflow updates only `sync/public-api`, opens a PR if needed, and leaves
+publication to the release process. Do not make manual edits on that branch.
+Copybara can replace it when a new source change arrives before PR merge.
+If Copybara returns exit code 4, the workflow closes the open sync PR and
+deletes the sync branch. This removes pending changes that the source has
+reverted. Repeated runs succeed when the PR and branch are already absent.
+Other Copybara errors stop the workflow before PR or branch cleanup.
+
+## Local use
+
+Validate the configuration and test export behavior without source access:
+
+```shell
+bazel run //tools:copybara -- validate "$PWD/copy.bara.sky"
+bazel test //tests:copybara_test
+```
+
+To preview an export with credentials that can read the source repository:
+
+```shell
+bazel run //tools:copybara -- migrate "$PWD/copy.bara.sky" public_api --dry-run
+```
+
+Before the first sync commit exists on `main`, add
+`--last-rev="$(cat sync/INITIAL_REVISION)"`. Later runs find the source revision
+from the last merged Copybara commit. Exit code 4 means no selected files changed.
+
+The integration test uses temporary local Git repositories. It checks first
+export, repeated export before and after merge, source reverts, changes,
+deletion, metadata, exclusion of private
+files, and preservation of destination build files.
+
+## Changes in the monorepo
+
+The package build and sync work without changes to `rime`. The old package PR
+can close once this replacement is reviewed. Keep any desired Arcana
+deprecation or license-header changes in a separate schema PR.
+
+A small compatibility workflow in `rime` is recommended. It should run the
+existing Bazel Buf tool on the public schema against the source PR base.
+That catches breaking changes before the engine merges them. The checks in
+this repository catch them again when the schema sync PR arrives.
+The file `rime-compatibility.patch` supplies that workflow for `rime/main`.
+It needs no package builders, Python or npm dependencies, or release tooling.

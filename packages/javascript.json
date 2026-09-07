@@ -1,0 +1,31 @@
+{
+  "name": "@rime/api",
+  "version": "@VERSION@",
+  "description": "Generated protocol definitions for Rime text-to-speech",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {"type": "git", "url": "git+https://github.com/rimelabs/rime-api.git"},
+  "files": ["esm", "commonjs", "schema", "SOURCE.json", "README.md", "LICENSE", "NOTICE"],
+  "main": "./commonjs/index.js",
+  "module": "./esm/index.js",
+  "types": "./esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./esm/index.d.ts",
+        "default": "./esm/index.js"
+      },
+      "require": {
+        "types": "./commonjs/index.d.ts",
+        "default": "./commonjs/index.js"
+      }
+    }
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.11.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0"
+}

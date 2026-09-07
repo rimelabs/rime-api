@@ -1,0 +1,7 @@
+version: v2
+modules:
+  - path: schema
+lint:
+  use: [MINIMAL]
+breaking:
+  use: [FILE]
