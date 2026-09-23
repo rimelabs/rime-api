@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package rime;
 
+import "google/protobuf/duration.proto";
+import "google/rpc/status.proto";
+
 service TextToSpeech {
   rpc Synthesize(SynthesisRequest) returns (stream SynthesisResponseStream) {}
   // Streaming text input: the client feeds text incrementally into a single
@@ -32,7 +35,8 @@ message StreamingSynthesisRequest {
 }
 
 message SynthesisRequest {
-  reserved 1;
+  reserved 1, 7;
+  reserved "arcana_parameters";
 
   // BCP-47 language tag, e.g. "en".
   // Used to route the frontend pipeline and set backend language.
@@ -50,13 +54,29 @@ message SynthesisRequest {
   // Defaults to SPLIT_STRATEGY_SENTENCE when unset.
   optional SplitStrategy split_strategy = 6;
 
-  optional ArcanaParameters arcana_parameters = 7;
   optional CodaParameters coda_parameters = 8;
   optional MistParameters mist_parameters = 9;
+
+  // Timestamps of the spoken spans of the synthesized audio, delivered in
+  // the trailer once the audio has drained. Off unless requested.
+  optional TimestampOptions timestamps = 10;
 }
 
 message SynthesisResponseStream {
-  bytes audio = 1;
+  oneof payload {
+    // A chunk of encoded audio, in the format requested.
+    bytes audio = 1;
+
+    // Sent once, after the last audio chunk, when the request asked for
+    // anything it carries. A request that asked for nothing sees no trailer.
+    SynthesisResponseTrailer trailer = 2;
+  }
+}
+
+// Results that settle only once the audio has drained.
+message SynthesisResponseTrailer {
+  // Present when `timestamps.enable` was set.
+  optional Timestamps timestamps = 1;
 }
 
 message AudioParameters {
@@ -66,22 +86,6 @@ message AudioParameters {
 
   optional int32 sampling_rate = 2;
   optional float time_scale_factor = 3;
-}
-
-message ArcanaParameters {
-  optional float repetition_penalty = 1;
-  optional float top_p = 2;
-  optional float temperature = 3;
-  optional int32 max_tokens = 4;
-  optional float presence_penalty = 5;
-  optional float frequency_penalty = 6;
-  optional int32 top_k = 7;
-  optional float min_p = 8;
-  optional int64 seed = 9;
-  optional int32 min_tokens = 13;
-  optional bool detokenize = 14;
-  optional bool skip_special_tokens = 15;
-  optional bool spaces_between_special_tokens = 16;
 }
 
 message CodaParameters {
@@ -106,10 +110,52 @@ message MistParameters {
   optional bool save_oovs = 4;
 }
 
+message TimestampOptions {
+  // Report a SpanTimestamp for every spoken span. Costs one aligner
+  // inference per request; never delays or fails the audio.
+  bool enable = 1;
+}
+
+// One span of the text the talker spoke, as the aligner segments it: a
+// whitespace-separated word of the request text after normalization (so
+// numbers and abbreviations appear spelled out), or a morpheme for a
+// language written without spaces.
+message SpanTimestamp {
+  string text = 1;
+  // Offsets from the start of the synthesized audio, at the audio's native
+  // rate and before `time_scale_factor`.
+  google.protobuf.Duration start = 2;
+  google.protobuf.Duration end = 3;
+}
+
+// The timestamps of one synthesis, delivered once after all audio: on gRPC
+// as `trailer.timestamps`, on WebSocket as `done.timestamps`. Absent when
+// the request did not ask for them. A non-OK status never fails the
+// synthesis that produced the audio.
+message Timestamps {
+  // How the alignment settled, with `code` a google.rpc.Code. `OK` carries
+  // spans; every other code carries none, with the reason in `message`:
+  //   INVALID_ARGUMENT     the aligner does not support the request's
+  //                        language, or rejected the utterance;
+  //   RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
+  //                        or the branch lost input under load;
+  //   DEADLINE_EXCEEDED    the aligner did not answer within its budget;
+  //   UNAVAILABLE          the aligner worker is not serving;
+  //   UNIMPLEMENTED        this package has no aligner;
+  //   CANCELLED            synthesis ended before alignment settled.
+  google.rpc.Status status = 1;
+  repeated SpanTimestamp spans = 2;
+}
+
 enum SplitStrategy {
   SPLIT_STRATEGY_UNSPECIFIED = 0;
   SPLIT_STRATEGY_SENTENCE = 1;
   SPLIT_STRATEGY_NONE = 2;
+  // Accumulates streamed sub-sentential text tokens into complete sentences
+  // before synthesis. Only valid for streaming requests
+  // (SynthesizeStreaming or the WebSocket API); a unary Synthesize request
+  // that asks for it is rejected.
+  SPLIT_STRATEGY_ACCUMULATE_SENTENCE = 3;
 }
 
 message NormalizeTextRequest {
@@ -285,7 +331,10 @@ message WebSocketStarted {
   string request_id = 1;
 }
 
-message WebSocketDone {}
+message WebSocketDone {
+  // Present when `start.timestamps.enable` was set.
+  optional Timestamps timestamps = 1;
+}
 
 message WebSocketCancelled {}
 
