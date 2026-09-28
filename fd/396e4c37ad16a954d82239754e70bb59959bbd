@@ -1,0 +1,30 @@
+.github/workflows/check.yaml
+  h_018052b8652914 8-9,58,71,74-79
+MODULE.bazel.lock
+  h_018052b8652914 1369-1419,1513-1523
+packages/README.md
+  h_018052b8652914 20
+packages/python.toml
+  h_018052b8652914 14
+pyproject.toml
+  h_018052b8652914 6-8
+requirements.txt
+  h_018052b8652914 2,26-37,55-62
+tests/packages_test.py
+  h_018052b8652914 21
+tests/release_automation_test.py
+  h_018052b8652914 95
+uv.lock
+  h_018052b8652914 38,45,47-56,103,105,107-112,127,129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fd396e4c37ad16a954d82239754e70bb59959bbd",
+  "prompts": {},
+  "humans": {
+    "h_018052b8652914": {
+      "author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
