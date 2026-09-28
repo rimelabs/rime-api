@@ -18,8 +18,7 @@ class PackageTest(unittest.TestCase):
         distribution = metadata.metadata("rime-api")
         self.assertEqual(distribution["Requires-Python"], ">=3.10")
         dependencies = distribution.get_all("Requires-Dist")
-        self.assertEqual(len(dependencies), 1)
-        self.assertTrue(dependencies[0].startswith("protobuf"))
+        self.assertEqual(dependencies, ["protobuf>=5.29.6"])
         source = json.loads(
             resources.files("rime_api").joinpath("SOURCE.json").read_text()
         )

@@ -17,7 +17,7 @@ encoded = request.SerializeToString()
 ```
 
 Python 3.10 or newer is required. The package includes type stubs. Its only
-runtime dependency is `protobuf`. It does not require gRPC.
+runtime dependency is `protobuf>=5.29.6`. It does not require gRPC.
 
 ## JavaScript and TypeScript
 
