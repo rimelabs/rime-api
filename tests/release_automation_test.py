@@ -3,12 +3,14 @@
 import base64
 import copy
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
+import zipfile
 
 from tools import release
 
@@ -148,6 +150,115 @@ class ReleaseAutomationTest(unittest.TestCase):
                 {"inputs": dict(inputs, version="0.0.1\nregistry=npm")}
             )
 
+    def prepare_with_record(self, original_run_id, published=False, expired=False):
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as output:
+            for name, data in self.files.items():
+                output.writestr(name, data)
+        source_archive = archive.getvalue()
+        original_record = dict(
+            self.record,
+            run_id=original_run_id,
+            artifact_id=44,
+            artifact_digest="sha256:" + hashlib.sha256(source_archive).hexdigest(),
+        )
+        record_archive = io.BytesIO()
+        with zipfile.ZipFile(record_archive, "w") as output:
+            output.writestr("RELEASE.json", json.dumps(original_record))
+        record_data = record_archive.getvalue()
+        source_artifact = {
+            "id": 44,
+            "name": "rime-api-dist",
+            "expired": False,
+            "workflow_run": {"head_sha": self.commit},
+            "digest": original_record["artifact_digest"],
+        }
+        claim_artifact = {
+            "id": 55,
+            "name": f"release-dist-{self.version}",
+            "expired": expired,
+            "workflow_run": {"id": 987},
+            "digest": "sha256:" + hashlib.sha256(record_data).hexdigest(),
+        }
+
+        def github(path):
+            if path == "actions/runs/123":
+                return dict(self.run, run_attempt=1)
+            self.assertEqual(path, "actions/runs/987")
+            return dict(
+                self.run,
+                id=987,
+                event="workflow_dispatch",
+                path=".github/workflows/release.yaml",
+            )
+
+        def github_pages(path, key=None):
+            if path.endswith("/jobs?per_page=100"):
+                return [
+                    {"name": name, "conclusion": "success"}
+                    for name in ["build", "python (3.13)", "javascript (24)"]
+                ]
+            if path == "actions/runs/123/artifacts?per_page=100":
+                return [source_artifact]
+            if path == "releases?per_page=100":
+                return (
+                    [
+                        {
+                            "tag_name": f"v{self.version}",
+                            "assets": [{"name": "RELEASE.json", "id": 66}],
+                        }
+                    ]
+                    if published
+                    else []
+                )
+            self.assertEqual(
+                path, f"actions/artifacts?name=release-dist-{self.version}&per_page=100"
+            )
+            return [claim_artifact]
+
+        def command(*arguments):
+            if arguments[:2] == ("git", "merge-base"):
+                return b""
+            if arguments[:2] == ("git", "show"):
+                return (
+                    self.version.encode()
+                    if arguments[2].endswith(":VERSION")
+                    else b"schema"
+                )
+            self.assertEqual(arguments[:2], ("gh", "api"))
+            path = arguments[2]
+            if path.endswith("/artifacts/44/zip"):
+                return source_archive
+            if path.endswith("/artifacts/55/zip"):
+                return record_data
+            self.assertTrue(path.endswith("/releases/assets/66"))
+            return json.dumps(original_record).encode()
+
+        destination = self.directory / "prepared"
+        with (
+            patch.object(release, "github", side_effect=github),
+            patch.object(release, "github_pages", side_effect=github_pages),
+            patch.object(release, "command", side_effect=command),
+            patch.object(release, "validate_archives"),
+        ):
+            release.prepare(123, self.version, destination)
+        return json.loads((destination / "RELEASE.json").read_text())
+
+    def test_partial_publication_reserves_the_original_check_run(self):
+        with self.assertRaisesRegex(ValueError, "already assigned to check run 100"):
+            self.prepare_with_record(100)
+
+    def test_completed_release_rejects_another_check_run_before_publication(self):
+        with self.assertRaisesRegex(ValueError, "already assigned to check run 100"):
+            self.prepare_with_record(100, published=True)
+
+    def test_same_check_run_can_resume_partial_publication(self):
+        self.assertEqual(self.prepare_with_record(123)["run_id"], 123)
+
+    def test_expired_reservation_cannot_be_silently_replaced(self):
+        with self.assertRaisesRegex(ValueError, "expired"):
+            self.prepare_with_record(100, expired=True)
+
     def test_incomplete_registry_cannot_finalize(self):
         with (
             patch.object(release, "registry_metadata", return_value=None),
@@ -216,14 +327,27 @@ class ReleaseAutomationTest(unittest.TestCase):
             return b""
 
         draft = {"tag_name": f"v{self.version}", "draft": True, "assets": []}
+
+        def list_releases(path):
+            self.assertEqual(path, "releases?per_page=100")
+            if existing:
+                return [existing]
+            if any(item[:3] == ("gh", "release", "create") for item in commands):
+                return [draft]
+            return []
+
         with (
             patch.object(release, "published_release", return_value=True),
             patch.object(release, "commit_file", return_value=self.version),
             patch.object(release, "release_pull_request", return_value=42),
+            patch.object(release, "github_pages", side_effect=list_releases),
             patch.object(
-                release, "github_pages", return_value=[existing] if existing else []
+                release,
+                "github",
+                side_effect=AssertionError(
+                    "Drafts cannot be fetched through releases/tags"
+                ),
             ),
-            patch.object(release, "github", return_value=draft),
             patch.object(release, "command", side_effect=command),
             patch.object(
                 release.subprocess,

@@ -21,6 +21,18 @@ js_library(
     visibility = ["//tests:__pkg__"],
 )
 
+js_library(
+    name = "release_publication_workflow",
+    srcs = [".github/workflows/release.yaml"],
+    visibility = ["//tests:__pkg__"],
+)
+
+js_library(
+    name = "release_selection_workflow",
+    srcs = [".github/workflows/release-select.yaml"],
+    visibility = ["//tests:__pkg__"],
+)
+
 api_packages(
     name = "packages",
     asyncapi = "//schema:text_to_speech.asyncapi.yaml",

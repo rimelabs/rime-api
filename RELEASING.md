@@ -73,13 +73,18 @@ and [PyPI pending publisher guide](https://docs.pypi.org/trusted-publishers/crea
 4. Wait for checks on the latest release PR commit, then merge the PR.
    Merging authorizes publication to both registries. Do not enable automatic
    merging on release PRs. You can leave the PR open to collect more changes.
-5. Wait for `Check packages` and `Release packages` to pass. The release
-   workflow accepts automatic publication only for the exact merged commit
+5. Wait for `Check packages`, `Select checked release`, and `Release packages`
+   to pass. Selection accepts automatic publication only for the exact merged commit
    of the bot's release PR. Ordinary commits, schema sync PRs, failed checks,
    fork runs, and checks on the unmerged release branch do not publish.
 6. Confirm that the GitHub release contains the package archives,
    `SOURCE.json`, and `RELEASE.json`. The workflow creates `vX.Y.Z` at the
    tested commit only after both registries pass verification.
+
+`Select checked release` dispatches `release.yaml` with the checked run ID and
+version. The publishing workflow holds a concurrency lock for that version
+through preparation, both registry jobs, and finalization. Manual recovery
+uses the same lock. Separate check runs cannot publish that version concurrently.
 
 Keep `VERSION` as the package version source. The manifest records Release
 Please's version and must agree with `VERSION`; package templates continue
@@ -114,9 +119,16 @@ version stop the release. After publication, the workflow downloads the
 registry files, checks their contents, and tests Python imports and message
 serialization, plus JavaScript ESM, CommonJS, and TypeScript use.
 
-The run retains the archives and a `RELEASE.json` record in its `release-dist`
+The run retains the archives and a `RELEASE.json` record in its `release-dist-X.Y.Z`
 artifact for 90 days. The record includes the source commit, test run,
 original artifact identity, and archive checksums.
+
+Before publication starts, this artifact reserves the version for that check
+run and its original archive. Later attempts compare their record with the
+existing GitHub release or prior publishing artifacts. A different check run
+or rebuilt artifact stops before registry uploads, even if the package bytes
+match. Use the original run ID shown in the error. The final GitHub release
+retains the record after CI artifacts expire.
 
 ## Failed runs and manual recovery
 

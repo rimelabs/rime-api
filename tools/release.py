@@ -260,8 +260,71 @@ def prepare(run_id, version, directory):
             for name, contents in files.items()
         },
     }
+    check_release_record(record)
     (directory / "RELEASE.json").write_text(json.dumps(record, indent=2) + "\n")
     print(f"Verified {version} from {commit}, test run {run_id}")
+
+
+def check_release_record(record):
+    """Keep one source run per version, including retries after a partial upload.
+
+    The caller must hold the version's workflow concurrency lock until publication
+    and finalization finish. The prepared artifact reserves the record before any
+    registry writes; the GitHub release retains it after CI artifacts expire.
+    """
+    version = record["version"]
+
+    def compare(data):
+        original = json.loads(data)
+        require(
+            original == record,
+            f"Version {version} is already assigned to check run {original['run_id']}. "
+            "Retry that run and its original artifact; do not replace RELEASE.json.",
+        )
+
+    for existing in github_pages("releases?per_page=100"):
+        if existing["tag_name"] == f"v{version}":
+            for asset in existing["assets"]:
+                if asset["name"] == "RELEASE.json":
+                    compare(
+                        command(
+                            "gh",
+                            "api",
+                            f"repos/{REPOSITORY}/releases/assets/{asset['id']}",
+                            "-H",
+                            "Accept: application/octet-stream",
+                        )
+                    )
+                    return
+
+    name = f"release-dist-{version}"
+    artifacts = github_pages(f"actions/artifacts?name={name}&per_page=100", "artifacts")
+    for artifact in artifacts:
+        if artifact["name"] != name:
+            continue
+        run = github(f"actions/runs/{artifact['workflow_run']['id']}")
+        if (
+            run["path"] != ".github/workflows/release.yaml"
+            or run["event"] != "workflow_dispatch"
+            or run["head_branch"] != "main"
+            or run["head_repository"]["full_name"] != REPOSITORY
+            or run["repository"]["full_name"] != REPOSITORY
+        ):
+            continue
+        require(not artifact["expired"], "The original release record artifact expired")
+        data = command(
+            "gh", "api", f"repos/{REPOSITORY}/actions/artifacts/{artifact['id']}/zip"
+        )
+        require(
+            artifact["digest"] == "sha256:" + hashlib.sha256(data).hexdigest(),
+            "Release record artifact checksum differs",
+        )
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            require(
+                archive.namelist().count("RELEASE.json") == 1,
+                "Invalid release record artifact",
+            )
+            compare(archive.read("RELEASE.json"))
 
 
 def fetch(url):
@@ -451,7 +514,16 @@ def finalize_release(directory):
             "--notes-file",
             str(notes_path),
         )
-        existing = github(f"releases/tags/{tag}")
+        # The REST tag lookup excludes drafts. The authenticated list includes them.
+        existing = next(
+            (
+                item
+                for item in github_pages("releases?per_page=100")
+                if item["tag_name"] == tag
+            ),
+            None,
+        )
+        require(existing is not None, "The newly created draft release was not found")
     assets = {asset["name"]: asset for asset in existing["assets"]}
     for name in [*record["sha256"], "RELEASE.json"]:
         path = directory / name

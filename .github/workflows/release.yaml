@@ -1,9 +1,5 @@
 name: Release packages
 on:
-  workflow_run:
-    workflows: [Check packages]
-    branches: [main]
-    types: [completed]
   workflow_dispatch:
     inputs:
       run_id:
@@ -25,8 +21,8 @@ permissions:
   actions: read
   pull-requests: read
 concurrency:
-  # Ordinary main checks must not replace a pending release in the concurrency queue.
-  group: release-packages-${{ github.event.workflow_run.id || inputs.run_id }}
+  # Selection happens before dispatch. Hold this lock through finalization.
+  group: release-packages-${{ inputs.version }}
   cancel-in-progress: false
 jobs:
   prepare:
@@ -68,7 +64,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: steps.selection.outputs.run_id != ''
         with:
-          name: release-dist
+          name: release-dist-${{ steps.selection.outputs.version }}
           path: release-dist/
           retention-days: 90
   npm:
@@ -86,7 +82,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: release-dist
+          name: release-dist-${{ needs.prepare.outputs.version }}
           path: release-dist/
       - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v6
@@ -130,7 +126,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: release-dist
+          name: release-dist-${{ needs.prepare.outputs.version }}
           path: release-dist/
       - uses: astral-sh/setup-uv@v7
       - name: Check whether PyPI needs publication
@@ -173,7 +169,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: release-dist
+          name: release-dist-${{ needs.prepare.outputs.version }}
           path: release-dist/
       - uses: astral-sh/setup-uv@v7
       - name: Check whether both registries are complete

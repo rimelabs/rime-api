@@ -2,6 +2,20 @@ load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@rules_python//python:py_test.bzl", "py_test")
 
 js_test(
+    name = "release_publication_workflow_test",
+    size = "small",
+    args = [
+        "$(rootpath //:release_publication_workflow)",
+        "$(rootpath //:release_selection_workflow)",
+    ],
+    data = [
+        "//:release_publication_workflow",
+        "//:release_selection_workflow",
+    ],
+    entry_point = "release_publication_workflow_test.mjs",
+)
+
+js_test(
     name = "release_workflow_test",
     size = "small",
     args = ["$(rootpath //:release_workflow)"],
