@@ -3,8 +3,9 @@ name = "rime-api-build"
 version = "0.0.1"
 requires-python = ">=3.13"
 dependencies = [
-  "grpcio-tools==1.78.0",
-  "protobuf==6.33.5",
+  # Keep generated Python bindings compatible with the oldest supported runtime.
+  "grpcio-tools==1.71.2",
+  "protobuf==5.29.6",
   "hatchling==1.27.0",
 ]
 

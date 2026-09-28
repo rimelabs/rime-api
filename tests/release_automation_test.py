@@ -92,6 +92,7 @@ class ReleaseAutomationTest(unittest.TestCase):
             ("conclusion", "cancelled"),
             ("head_branch", "release-please--branches--main"),
             ("event", "pull_request"),
+            ("event", "schedule"),
             ("head_repository", {"full_name": "fork/rime-api"}),
         ]:
             with self.subTest(field=field, value=value):

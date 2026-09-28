@@ -5,6 +5,8 @@ on:
     branches: [main]
     tags: ['v*']
   workflow_dispatch:
+  schedule:
+    - cron: '23 8 * * 1'
 permissions:
   contents: read
 jobs:
@@ -53,7 +55,7 @@ jobs:
     strategy:
       matrix:
         python: ['3.10', '3.11', '3.12', '3.13', '3.14']
-        protobuf: ['6.33.5', '7.36.1']
+        protobuf: ['protobuf==5.29.6', 'protobuf==6.33.5', 'protobuf==7.36.1', 'protobuf']
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
@@ -66,12 +68,15 @@ jobs:
       - name: Test installed wheel and source distribution
         env:
           PYTHON_VERSION: ${{ matrix.python }}
-          PROTOBUF_VERSION: ${{ matrix.protobuf }}
+          PROTOBUF_REQUIREMENT: ${{ matrix.protobuf }}
         run: |
           for distribution in dist/*.whl dist/*.tar.gz; do
-            uv run --isolated --no-project --python "$PYTHON_VERSION" \
-              --with "$distribution" --with "protobuf==$PROTOBUF_VERSION" \
-              python tests/packages_test.py --fixtures tests/fixtures.json
+            for implementation in upb python; do
+              PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION="$implementation" \
+                uv run --isolated --no-project --python "$PYTHON_VERSION" \
+                  --with "$distribution" --with "$PROTOBUF_REQUIREMENT" \
+                  python tests/packages_test.py --fixtures tests/fixtures.json
+            done
           done
   javascript:
     needs: build
