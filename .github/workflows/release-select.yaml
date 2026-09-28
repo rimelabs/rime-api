@@ -1,0 +1,46 @@
+name: Select checked release
+on:
+  workflow_run:
+    workflows: [Check packages]
+    branches: [main]
+    types: [completed]
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+jobs:
+  select:
+    if: github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+      - name: Select the checked release commit
+        id: selection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py select \
+            --event "$GITHUB_EVENT_PATH" >> "$GITHUB_OUTPUT"
+      - name: Dispatch publication under the version lock
+        if: steps.selection.outputs.run_id != ''
+        uses: actions/github-script@v7
+        env:
+          RELEASE_RUN_ID: ${{ steps.selection.outputs.run_id }}
+          RELEASE_VERSION: ${{ steps.selection.outputs.version }}
+          RELEASE_REGISTRY: ${{ steps.selection.outputs.registry }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'release.yaml',
+              ref: 'main',
+              inputs: {
+                run_id: process.env.RELEASE_RUN_ID,
+                version: process.env.RELEASE_VERSION,
+                registry: process.env.RELEASE_REGISTRY,
+              },
+            });

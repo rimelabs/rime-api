@@ -75,7 +75,9 @@ uv export --locked --format requirements-txt --no-emit-project --output-file req
 Node.js dependency changes use the pinned pnpm version in `package.json`.
 Commit both dependency manifests and their lockfiles.
 
-See [release instructions](RELEASING.md) to publish tested archives.
+Release Please prepares a shared version and changelog in a release PR.
+Merging that PR starts publication after package checks pass on the merged
+commit. See [release instructions](RELEASING.md) for setup and recovery.
 
 ## License
 

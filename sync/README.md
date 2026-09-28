@@ -18,6 +18,12 @@ Copybara creates a commit on `sync/public-api`. The workflow opens a PR against
 and author. It does not copy private commit descriptions or author addresses.
 Merge the sync PR with its revision trailer intact. A merge commit or a
 fast-forward preserves it. If you squash, retain the trailer in the result.
+The fixed public commit message and PR title are
+`feat(api): sync public API definitions`. This selects a feature release in
+Release Please without copying private source commit descriptions. Review
+the proposed version and public changelog in the separate release PR. Use
+`fix:` for corrections and `feat!:` for breaking changes when preparing a
+squash commit, and retain `GitOrigin-RevId`. Compatibility checks still apply.
 
 ## Initial source revision
 
@@ -43,7 +49,9 @@ the workflow on `main` uses the sync credential. Normal PR checks need no
 access to the private repository.
 
 The workflow updates only `sync/public-api`, opens a PR if needed, and leaves
-publication to the release process. Do not make manual edits on that branch.
+publication to the release process. Merging the sync PR lets Release Please
+open or update the release PR. Merging the release PR starts publication after
+checks pass on its merged commit. Do not make manual edits on the sync branch.
 Copybara can replace it when a new source change arrives before PR merge.
 If Copybara returns exit code 4, the workflow closes the open sync PR and
 deletes the sync branch. This removes pending changes that the source has

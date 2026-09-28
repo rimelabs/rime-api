@@ -1,3 +1,4 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@npm//:@bufbuild/protoc-gen-es/package_json.bzl", protoc_gen_es = "bin")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//packages:packages.bzl", "api_packages")
@@ -13,6 +14,24 @@ exports_files([
     "VERSION",
     "copy.bara.sky",
 ])
+
+js_library(
+    name = "release_workflow",
+    srcs = [".github/workflows/release-please.yaml"],
+    visibility = ["//tests:__pkg__"],
+)
+
+js_library(
+    name = "release_publication_workflow",
+    srcs = [".github/workflows/release.yaml"],
+    visibility = ["//tests:__pkg__"],
+)
+
+js_library(
+    name = "release_selection_workflow",
+    srcs = [".github/workflows/release-select.yaml"],
+    visibility = ["//tests:__pkg__"],
+)
 
 api_packages(
     name = "packages",
