@@ -76,5 +76,5 @@ jobs:
           compatibility checks must pass before merge. Package publication is separate.
           BODY
             gh pr create --head sync/public-api --base main \
-              --title 'Sync public API definitions' --body-file /tmp/rime-api-sync-pr.md
+              --title 'feat(api): sync public API definitions' --body-file /tmp/rime-api-sync-pr.md
           fi

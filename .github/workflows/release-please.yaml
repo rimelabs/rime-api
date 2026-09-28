@@ -1,0 +1,47 @@
+name: Prepare release PR
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prepare-release-pr
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          target-branch: main
+          # Publication verifies both registries before creating a tag or release.
+          skip-github-release: true
+      - name: Start checks on the release PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'open', base: 'main',
+            });
+            const releasePullRequest = pullRequests.find(pullRequest =>
+              pullRequest.user.login === 'github-actions[bot]' &&
+              pullRequest.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pullRequest.head.ref === 'release-please--branches--main' &&
+              pullRequest.labels.some(label => label.name === 'autorelease: pending')
+            );
+            if (releasePullRequest) {
+              // GITHUB_TOKEN changes do not start pull_request workflows.
+              // Look up the open PR on retries even if Release Please changed nothing.
+              await github.rest.actions.createWorkflowDispatch({
+                ...context.repo,
+                workflow_id: 'check.yaml',
+                ref: releasePullRequest.head.ref,
+              });
+            }

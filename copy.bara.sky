@@ -23,7 +23,7 @@ core.workflow(
     authoring = authoring.overwrite("Rime API Sync <noreply@rime.ai>"),
     transformations = [
         core.move("interfaces", "schema"),
-        metadata.replace_message("Sync public API definitions\n"),
+        metadata.replace_message("feat(api): sync public API definitions\n"),
     ],
     mode = "SQUASH",
     check_last_rev_state = True,

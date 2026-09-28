@@ -1,5 +1,9 @@
 name: Release packages
 on:
+  workflow_run:
+    workflows: [Check packages]
+    branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       run_id:
@@ -14,46 +18,62 @@ on:
         description: Registry to publish
         required: true
         type: choice
-        default: npm
+        default: both
         options: [npm, pypi, both]
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 concurrency:
-  group: release-packages
+  # Ordinary main checks must not replace a pending release in the concurrency queue.
+  group: release-packages-${{ github.event.workflow_run.id || inputs.run_id }}
   cancel-in-progress: false
 jobs:
   prepare:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.selection.outputs.run_id }}
+      version: ${{ steps.selection.outputs.version }}
+      registry: ${{ steps.selection.outputs.registry }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
       - uses: astral-sh/setup-uv@v7
-      - name: Verify and download tested archives
+      - name: Select the checked release commit
+        id: selection
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_RUN_ID: ${{ inputs.run_id }}
-          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py select \
+            --event "$GITHUB_EVENT_PATH" >> "$GITHUB_OUTPUT"
+      - name: Verify and download tested archives
+        if: steps.selection.outputs.run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_RUN_ID: ${{ steps.selection.outputs.run_id }}
+          RELEASE_VERSION: ${{ steps.selection.outputs.version }}
         run: |
           uv run --no-project --python 3.13 python tools/release.py prepare \
             --run-id "$RELEASE_RUN_ID" --version "$RELEASE_VERSION" --directory release-dist
       - name: Check existing registry versions
+        if: steps.selection.outputs.run_id != ''
         env:
-          RELEASE_REGISTRY: ${{ inputs.registry }}
+          RELEASE_REGISTRY: ${{ steps.selection.outputs.registry }}
         run: |
           uv run --no-project --python 3.13 python tools/release.py registry \
             --registry "$RELEASE_REGISTRY" --directory release-dist
       - uses: actions/upload-artifact@v7
+        if: steps.selection.outputs.run_id != ''
         with:
           name: release-dist
           path: release-dist/
           retention-days: 90
   npm:
     needs: prepare
-    if: inputs.registry == 'npm' || inputs.registry == 'both'
+    if: needs.prepare.outputs.registry == 'npm' || needs.prepare.outputs.registry == 'both'
     runs-on: ubuntu-latest
     environment: npm-release
     permissions:
@@ -82,7 +102,7 @@ jobs:
       - name: Publish to npm with Trusted Publishing
         if: steps.existing.outputs.npm_publish_required == 'true'
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           # npm provenance is unavailable for private source repositories.
           NPM_CONFIG_PROVENANCE: ${{ !github.event.repository.private }}
         run: |
@@ -97,7 +117,7 @@ jobs:
         run: bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz
   pypi:
     needs: prepare
-    if: inputs.registry == 'pypi' || inputs.registry == 'both'
+    if: needs.prepare.outputs.registry == 'pypi' || needs.prepare.outputs.registry == 'both'
     runs-on: ubuntu-latest
     environment: pypi-release
     permissions:
@@ -121,7 +141,7 @@ jobs:
       - name: Publish to PyPI with Trusted Publishing
         if: steps.existing.outputs.pypi_publish_required == 'true'
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           uv publish --trusted-publishing always \
             "release-dist/rime_api-$RELEASE_VERSION-py3-none-any.whl" \
@@ -136,3 +156,64 @@ jobs:
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
           done
+  finalize:
+    needs: [prepare, npm, pypi]
+    if: >-
+      !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.run_id != '' && (needs.npm.result == 'success' || needs.npm.result == 'skipped') && (needs.pypi.result == 'success' || needs.pypi.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: release-dist/
+      - uses: astral-sh/setup-uv@v7
+      - name: Check whether both registries are complete
+        id: published
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py ready \
+            --directory release-dist >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v6
+        if: steps.published.outputs.ready == 'true' && needs.npm.result == 'skipped'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify npm after a Python-only recovery
+        if: steps.published.outputs.ready == 'true' && needs.npm.result == 'skipped'
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry npm --directory release-dist --download "$RUNNER_TEMP/npm-release"
+          bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz
+      - name: Verify PyPI after an npm-only recovery
+        if: steps.published.outputs.ready == 'true' && needs.pypi.result == 'skipped'
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry pypi --directory release-dist --download "$RUNNER_TEMP/pypi-release"
+          for distribution in "$RUNNER_TEMP/pypi-release/"*; do
+            uv run --isolated --no-project --python 3.13 --with "$distribution" \
+              python tests/packages_test.py --fixtures tests/fixtures.json
+          done
+      - name: Create the verified tag and GitHub release
+        if: steps.published.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          uv run --no-project --python 3.13 python tools/release.py finalize --directory release-dist
+      - name: Prepare any changes merged during publication
+        if: steps.published.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release-please.yaml --repo "$GITHUB_REPOSITORY" --ref main
+      - name: Report incomplete publication
+        if: steps.published.outputs.ready != 'true'
+        run: |
+          echo 'The other registry is incomplete. Retry the same run ID and version for that registry. No tag or GitHub release was created.' >> "$GITHUB_STEP_SUMMARY"

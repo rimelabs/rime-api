@@ -33,11 +33,72 @@ def github(path):
     return json.loads(command("gh", "api", f"repos/{REPOSITORY}/{path}"))
 
 
-def github_pages(path, key):
+def github_pages(path, key=None):
     pages = json.loads(
         command("gh", "api", "--paginate", "--slurp", f"repos/{REPOSITORY}/{path}")
     )
-    return [item for page in pages for item in page[key]]
+    return [item for page in pages for item in (page[key] if key else page)]
+
+
+def commit_file(commit, path):
+    return command("git", "show", f"{commit}:{path}").decode().strip()
+
+
+def release_pull_request(commit):
+    """Find the reviewed release PR for this exact commit, not a later main tip."""
+    candidates = github_pages(f"commits/{commit}/pulls?per_page=100")
+    candidates = [
+        request
+        for request in candidates
+        if request["merged_at"]
+        and request["merge_commit_sha"] == commit
+        and request["base"]["ref"] == "main"
+        and request["base"]["repo"]["full_name"] == REPOSITORY
+        and request["head"]["repo"]
+        and request["head"]["repo"]["full_name"] == REPOSITORY
+        and request["head"]["ref"] == "release-please--branches--main"
+        and request["user"]["login"] == "github-actions[bot]"
+        and {label["name"] for label in request["labels"]}
+        & {"autorelease: pending", "autorelease: tagged"}
+    ]
+    require(len(candidates) <= 1, "Multiple release PRs match the commit")
+    return candidates[0]["number"] if candidates else None
+
+
+def select_release(event):
+    """Select automatic releases only after checks on a merged release PR."""
+    if "workflow_run" in event:
+        completed = event["workflow_run"]
+        if (
+            completed["head_branch"] != "main"
+            or completed["event"] not in {"push", "workflow_dispatch"}
+            or completed["conclusion"] != "success"
+            or completed["head_repository"]["full_name"] != REPOSITORY
+        ):
+            return {}
+        run_id = completed["id"]
+        run = github(f"actions/runs/{run_id}")
+        validate_run(run, run_id)
+        require(run["head_sha"] == completed["head_sha"], "Completed commit differs")
+        commit = run["head_sha"]
+        if not release_pull_request(commit):
+            return {}
+        version = commit_file(commit, "VERSION")
+        manifest = json.loads(commit_file(commit, ".release-please-manifest.json"))
+        require(manifest == {".": version}, "Release manifest and VERSION differ")
+        require(
+            commit_file(f"{commit}^", "VERSION") != version,
+            "Release PR did not change VERSION",
+        )
+        registry = "both"
+    else:
+        inputs = event["inputs"]
+        run_id = int(inputs["run_id"])
+        version = inputs["version"]
+        registry = inputs["registry"]
+    archive_names(version)
+    require(registry in {"npm", "pypi", "both"}, "Unexpected registry")
+    return {"run_id": run_id, "version": version, "registry": registry}
 
 
 def validate_run(run, run_id):
@@ -300,9 +361,150 @@ def check_registry(registry, directory, download):
     )
 
 
+def published_release(directory):
+    """Require matching files on both registries before final verification."""
+    record = json.loads((directory / "RELEASE.json").read_text())
+    ready = True
+    for registry, names in archive_names(record["version"]).items():
+        files = {name: (directory / name).read_bytes() for name in names}
+        require(
+            all(
+                hashlib.sha256(data).hexdigest() == record["sha256"][name]
+                for name, data in files.items()
+            ),
+            "Prepared archive checksum differs",
+        )
+        published = compare_registry(
+            registry,
+            registry_metadata(registry, record["version"]),
+            files,
+            record["version"],
+        )
+        ready = ready and len(published) == len(names)
+    return ready
+
+
+def finalize_release(directory):
+    """Create the release at the tested commit; retries must preserve its files."""
+    require(published_release(directory), "Both registries must contain tested files")
+    record = json.loads((directory / "RELEASE.json").read_text())
+    version, commit = record["version"], record["commit"]
+    require(re.fullmatch(r"[0-9a-f]{40}", commit), "Invalid source commit")
+    command("git", "merge-base", "--is-ancestor", commit, "HEAD")
+    require(commit_file(commit, "VERSION") == version, "Commit version differs")
+    tag = f"v{version}"
+    references = (
+        command(
+            "git", "ls-remote", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"
+        )
+        .decode()
+        .splitlines()
+    )
+    references = dict(line.split()[::-1] for line in references)
+    target = references.get(f"refs/tags/{tag}^{{}}", references.get(f"refs/tags/{tag}"))
+    require(target is None or target == commit, "Existing tag points to another commit")
+    releases = github_pages("releases?per_page=100")
+    existing = next((item for item in releases if item["tag_name"] == tag), None)
+    if existing and not target:
+        require(
+            existing["target_commitish"] == commit, "Existing release commit differs"
+        )
+    if not target:
+        command(
+            "gh",
+            "api",
+            "--method",
+            "POST",
+            f"repos/{REPOSITORY}/git/refs",
+            "-f",
+            f"ref=refs/tags/{tag}",
+            "-f",
+            f"sha={commit}",
+        )
+    if not existing:
+        changelog = subprocess.run(
+            ["git", "show", f"{commit}:CHANGELOG.md"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        notes = f"Rime API {version}\n"
+        for section in re.split(r"(?m)^## ", changelog.stdout.decode())[1:]:
+            if re.match(rf"\[?{re.escape(version)}(?:\]|\s|$)", section):
+                notes = "## " + section
+                break
+        notes_path = directory / "release-notes.md"
+        notes_path.write_text(notes)
+        command(
+            "gh",
+            "release",
+            "create",
+            tag,
+            "--repo",
+            REPOSITORY,
+            "--verify-tag",
+            "--target",
+            commit,
+            "--draft",
+            "--title",
+            f"Rime API {version}",
+            "--notes-file",
+            str(notes_path),
+        )
+        existing = github(f"releases/tags/{tag}")
+    assets = {asset["name"]: asset for asset in existing["assets"]}
+    for name in [*record["sha256"], "RELEASE.json"]:
+        path = directory / name
+        if name in assets:
+            data = command(
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/releases/assets/{assets[name]['id']}",
+                "-H",
+                "Accept: application/octet-stream",
+            )
+            require(
+                data == path.read_bytes(), f"Existing release asset differs: {name}"
+            )
+        else:
+            command("gh", "release", "upload", tag, str(path), "--repo", REPOSITORY)
+    if existing["draft"]:
+        command("gh", "release", "edit", tag, "--repo", REPOSITORY, "--draft=false")
+    pull_request = release_pull_request(commit)
+    if pull_request:
+        command(
+            "gh",
+            "label",
+            "create",
+            "autorelease: tagged",
+            "--repo",
+            REPOSITORY,
+            "--color",
+            "ededed",
+            "--force",
+        )
+        command(
+            "gh",
+            "pr",
+            "edit",
+            str(pull_request),
+            "--repo",
+            REPOSITORY,
+            "--add-label",
+            "autorelease: tagged",
+            "--remove-label",
+            "autorelease: pending",
+        )
+    print(f"Released {tag} from {commit}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    selection = commands.add_parser("select")
+    selection.add_argument("--event", type=Path, required=True)
+    for name in ["ready", "finalize"]:
+        commands.add_parser(name).add_argument("--directory", type=Path, required=True)
     preparation = commands.add_parser("prepare")
     preparation.add_argument("--run-id", type=int, required=True)
     preparation.add_argument("--version", required=True)
@@ -312,7 +514,17 @@ def main():
     registry.add_argument("--directory", type=Path, required=True)
     registry.add_argument("--download", type=Path)
     arguments = parser.parse_args()
-    if arguments.command == "prepare":
+    if arguments.command == "select":
+        for name, value in select_release(
+            json.loads(arguments.event.read_text())
+        ).items():
+            print(f"{name}={value}")
+    elif arguments.command == "ready":
+        ready = published_release(arguments.directory)
+        print(f"ready={str(ready).lower()}")
+    elif arguments.command == "finalize":
+        finalize_release(arguments.directory)
+    elif arguments.command == "prepare":
         prepare(arguments.run_id, arguments.version, arguments.directory)
     else:
         require(

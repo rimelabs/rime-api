@@ -10,8 +10,11 @@ repository = Path(__file__).resolve().parents[1]
 version = (repository / "VERSION").read_text().strip()
 if not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version):
     raise SystemExit("VERSION must contain a stable major.minor.patch version")
-if sys.argv[1:] != [f"v{version}"]:
+if sys.argv[1:] and sys.argv[1:] != [f"v{version}"]:
     raise SystemExit(f"Release tag must be v{version}")
+manifest = json.loads((repository / ".release-please-manifest.json").read_text())
+if manifest != {".": version}:
+    raise SystemExit("Release Please manifest must match VERSION")
 python = tomllib.loads((repository / "packages/python.toml").read_text())
 javascript = json.loads((repository / "packages/javascript.json").read_text())
 for metadata, name in [(python["project"], "rime-api"), (javascript, "@rimelabs/api")]:
