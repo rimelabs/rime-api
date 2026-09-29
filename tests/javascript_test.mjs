@@ -49,7 +49,7 @@ import { WebSocketRequestSchema, SpeechWebSocketRequestSchema, StreamingOutputCo
 import type { WebSocketRequest, SpeechWebSocketRequest } from "@rimelabs/api";
 const synthesis: WebSocketRequest = create(WebSocketRequestSchema, { payload: { case: "text", value: "Hello." } });
 const recognition: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
-  payload: { case: "start", value: { outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
+  payload: { case: "start", value: { language: "en", outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
 });
 // @ts-expect-error STT audio must be bytes.
 const invalidAudio: SpeechWebSocketRequest = { ...recognition, payload: { case: "audio", value: "audio" } };

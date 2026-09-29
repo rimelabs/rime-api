@@ -187,9 +187,10 @@
     "message": "StreamingTranscriptionRequest",
     "json": {
       "config": {
+        "language": "en",
         "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS"
       }
     },
-    "hex": "0a022801"
+    "hex": "0a061a02656e2801"
   }
 ]

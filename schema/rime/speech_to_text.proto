@@ -3,7 +3,7 @@ syntax = "proto3";
 package rime;
 
 // Whole-utterance and realtime speech recognition for Cassowary. Cassowary
-// adapts this public contract to the native vLLM speech APIs; vLLM owns model
+// adapts this public contract to the native vLLM chat API; vLLM owns model
 // loading, inference, and GPU scheduling.
 service SpeechToText {
   // Transcribes one complete WAV payload. Language and formatting mode are
@@ -21,8 +21,7 @@ service SpeechToText {
 // Output formatting intent. The packaged model prompt describes the intent;
 // it steers the model rather than hard-guaranteeing token-level behavior.
 enum TranscriptionMode {
-  // Defaults to WRITTEN on the unary and REVISED_HYPOTHESES paths. The
-  // append-fragment realtime contract permits only this value.
+  // Defaults to TRANSCRIPTION_MODE_WRITTEN.
   TRANSCRIPTION_MODE_UNSPECIFIED = 0;
   // Standard written formatting: numerals as digits, codes compact.
   // "flight two four seven" is intended to come back as "flight 247".
@@ -34,7 +33,9 @@ enum TranscriptionMode {
 }
 
 message TranscriptionOptions {
-  // Optional BCP-47 language tag. Cassowary initially supports en and es.
+  // Required BCP-47 tag of the spoken language, resolved against the packaged
+  // catalog (`en` or `es`). An omitted tag or `und` is rejected with
+  // INVALID_ARGUMENT.
   optional string language = 1;
   TranscriptionMode mode = 2;
   // Recognition terms, for example ["Mitchell Gourley", "Super-G", "USOC"].
@@ -51,13 +52,14 @@ message TranscriptionOptions {
 // How the resolved language was chosen.
 enum LanguageSource {
   // The service could not resolve a catalog language for this result. Never
-  // a silent substitute for SELECTED or DETECTED.
+  // a silent substitute for LANGUAGE_SOURCE_SELECTED or
+  // LANGUAGE_SOURCE_DETECTED.
   LANGUAGE_SOURCE_UNSPECIFIED = 0;
   // The caller supplied the language and the service confirmed it against
   // the packaged model catalog.
   LANGUAGE_SOURCE_SELECTED = 1;
-  // The caller left the language unset (or requested `und`) and the model
-  // detected the served catalog language.
+  // The model detected the served catalog language. Not produced while every
+  // request must select its language.
   LANGUAGE_SOURCE_DETECTED = 2;
 }
 
@@ -73,14 +75,13 @@ message TranscriptionRequest {
   // packaged decoder may accept other WAV encodings/rates; those extensions
   // are not a portable interface guarantee. Headerless PCM is not WAV.
   bytes audio = 1;
+  // Required: `language` must select the spoken language.
   optional TranscriptionOptions options = 2;
 }
 
 message TranscriptionResponse {
   string text = 1;
-  // The canonical served language and whether the caller selected it or the
-  // model detected it. Absent when the service could not resolve a catalog
-  // language for this transcript.
+  // The canonical catalog language the caller selected.
   optional ResolvedLanguage language = 2;
 }
 
@@ -88,9 +89,11 @@ message TranscriptionResponse {
 enum StreamingOutputContract {
   // Invalid for a request: callers must explicitly select an output contract.
   STREAMING_OUTPUT_CONTRACT_UNSPECIFIED = 0;
-  // Responses are append-only `delta` fragments: concatenate them in arrival
-  // order (including newline separators between transcription windows) to
-  // form the transcript. The final `done` text equals that concatenation.
+  // Responses are append-only `delta` fragments: each five-second window of
+  // audio is transcribed once, on its own, so a fragment is never revised.
+  // Concatenate them in arrival order (including newline separators between
+  // transcription windows) to form the transcript. The final `done` text
+  // equals that concatenation.
   STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS = 1;
   // Responses are full replacing `hypothesis` transcripts: each hypothesis
   // carries the complete current transcript and a monotonically increasing
@@ -107,10 +110,9 @@ message StreamingConfig {
   reserved 1, 2;
   reserved "sample_rate_hertz", "channels";
 
-  // Under the append-fragment contract the native realtime backend accepts
-  // only the unset language (or `und`) and unspecified mode. Under REVISED_HYPOTHESES,
-  // `language` is an optional BCP-47 tag (omitted or `und` requests
-  // detection) and `mode` selects the written or verbatim prompt.
+  // Under either output contract, `language` is a required BCP-47 tag (an
+  // omitted tag or `und` is rejected) and `mode` selects the written or
+  // verbatim prompt.
   optional string language = 3;
   TranscriptionMode mode = 4;
 
@@ -118,9 +120,9 @@ message StreamingConfig {
   // selection before accepting audio; an unrecognized value is rejected
   // rather than silently downgraded.
   StreamingOutputContract output_contract = 5;
-  // Recognition terms, REVISED_HYPOTHESES sessions only. Same validation,
-  // budgets and composition as TranscriptionOptions.context_terms; an empty
-  // list adds no bias and is also accepted under append fragments.
+  // Recognition terms under either output contract. Same validation, budgets
+  // and composition as TranscriptionOptions.context_terms; an empty list adds
+  // no bias.
   repeated string context_terms = 6;
 }
 
@@ -142,24 +144,27 @@ message StreamingTranscriptionResponse {
     TranscriptionDelta delta = 1;
     // Exactly one final transcript for a successfully completed utterance.
     // Under the append-fragment contract its text equals the concatenation of
-    // all preceding delta fragments; under REVISED_HYPOTHESES it equals the
-    // last hypothesis. It may be empty when the input contains no recognized
+    // all preceding delta fragments; under
+    // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES it equals the last
+    // hypothesis. It may be empty when the input contains no recognized
     // speech.
     TranscriptionDone done = 2;
     // Confirms the selected output contract before any audio-derived
-    // response. Every accepted configuration selects APPEND_FRAGMENTS or
-    // REVISED_HYPOTHESES; UNSPECIFIED is rejected as invalid input.
+    // response. Every accepted configuration selects
+    // STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS or
+    // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES;
+    // STREAMING_OUTPUT_CONTRACT_UNSPECIFIED is rejected as invalid input.
     StreamingAccepted accepted = 3;
-    // The latest full transcript hypothesis under REVISED_HYPOTHESES. Each
-    // hypothesis replaces the previous one entirely.
+    // The latest full transcript hypothesis under
+    // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES. Each hypothesis replaces
+    // the previous one entirely.
     TranscriptionHypothesis hypothesis = 4;
   }
 }
 
 message StreamingAccepted {
   StreamingOutputContract output_contract = 1;
-  // Present when the caller selected a language. A detected language is
-  // reported on `done` once it is known.
+  // Confirms the selected language.
   optional ResolvedLanguage language = 2;
 }
 
@@ -177,11 +182,12 @@ message TranscriptionHypothesis {
 
 message TranscriptionDone {
   string text = 1;
-  // See TranscriptionResponse.language. Reported under REVISED_HYPOTHESES;
-  // absent under the append-fragment contract.
+  // See TranscriptionResponse.language. Reported under either output
+  // contract.
   optional ResolvedLanguage language = 2;
-  // The revision of the final hypothesis under REVISED_HYPOTHESES; zero under
-  // the append-fragment contract.
+  // The revision of the final hypothesis under
+  // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES; zero under the
+  // append-fragment contract.
   uint64 revision = 3;
 }
 
@@ -218,7 +224,8 @@ message SpeechWebSocketResponse {
     TranscriptionDone done = 3;
     SpeechWebSocketError error = 4;
     SpeechWebSocketCancelled cancelled = 5;
-    // Full-hypothesis partial under REVISED_HYPOTHESES; see
+    // Full-hypothesis partial under
+    // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES; see
     // TranscriptionHypothesis.
     TranscriptionHypothesis hypothesis = 6;
   }
@@ -226,7 +233,8 @@ message SpeechWebSocketResponse {
 
 message SpeechWebSocketStarted {
   string request_id = 1;
-  // Confirms APPEND_FRAGMENTS or REVISED_HYPOTHESES before any audio-derived
+  // Confirms STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS or
+  // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES before any audio-derived
   // response. Present for every accepted configuration.
   optional StreamingAccepted accepted = 2;
 }

@@ -39,7 +39,7 @@ The initial snapshot does not depend on the `nastassy/rime-protos` branch or
 its PR. It does not include that PR's Arcana deprecation annotations.
 
 The STT files were added as exact copies from source revision
-`152718dadfa8faab372ebe4c3e974293330990c4`. The existing TTS files and the
+`a7f0a964c107164a12e6f0647944a5d63345e09a`. The existing TTS files and the
 bootstrap revision were retained. Later Copybara exports include all four files.
 
 ## Configure the workflow

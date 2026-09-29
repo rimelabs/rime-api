@@ -29,7 +29,8 @@ info:
     `start.outputContract` selects how partial transcripts arrive:
 
     - `STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS`: the
-      server emits append-only `delta` fragments. Concatenate them in
+      server transcribes each five-second window of audio once, on its own,
+      and emits it as an append-only `delta` fragment. Concatenate them in
       arrival order, including newline separators between transcription
       windows; a successful `done.text` equals that concatenation.
     - `STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES`: the server emits full
@@ -38,13 +39,15 @@ info:
       successful `done.text` equals the last hypothesis and carries its
       revision, except that an utterance with no recognized speech may emit
       no hypothesis at all and finish with an empty `done.text` and revision
-      0 (omitted in canonical JSON). `start.language`, `start.mode` and
-      `start.contextTerms` are recognition controls accepted only under this
-      contract.
+      0 (omitted in canonical JSON).
 
-    The output contract is required. Unset, unspecified and unrecognized
-    values are rejected with `invalid_input`. Every accepted selection is
-    confirmed on `started.accepted` before any audio-derived response.
+    `start.language`, `start.mode` and `start.contextTerms` are recognition
+    controls accepted under either contract.
+
+    The output contract and the language are required. Unset, unspecified and
+    unrecognized values are rejected with `invalid_input`. Every accepted
+    selection is confirmed on `started.accepted` before any audio-derived
+    response.
 
     ### Framing and bounds
 
@@ -251,7 +254,7 @@ components:
                 description: >-
                   Present for every accepted configuration, confirming its
                   explicitly selected output contract.
-                required: [outputContract]
+                required: [outputContract, language]
                 properties:
                   outputContract:
                     $ref: '#/components/schemas/streamingOutputContract'
@@ -259,8 +262,7 @@ components:
                     allOf:
                       - $ref: '#/components/schemas/resolvedLanguage'
                     description: >-
-                      Present when the caller selected a language; a detected
-                      language is reported on `done` once known.
+                      Confirms the selected language.
 
     delta:
       name: delta
@@ -325,8 +327,7 @@ components:
                 allOf:
                   - $ref: '#/components/schemas/resolvedLanguage'
                 description: >-
-                  Reported under the revised-hypotheses contract; absent
-                  under the append-fragment contract.
+                  The selected catalog language, under either contract.
               revision:
                 type: string
                 description: >-
@@ -379,19 +380,17 @@ components:
       type: object
       description: >-
         Proto3 JSON encoding of `rime.StreamingConfig`. An empty
-        configuration is invalid: outputContract must be explicitly selected.
-        `outputContract` applies to both contracts (explicit append fragments
-        is a valid selection); the recognition controls `language`, `mode`
-        and `contextTerms` require the revised-hypotheses contract, though an
-        unspecified `mode` and empty `contextTerms` are tolerated under append.
-      required: [outputContract]
+        configuration is invalid: outputContract and language must be
+        explicitly selected. The recognition controls `language`, `mode` and
+        `contextTerms` apply under either output contract.
+      required: [outputContract, language]
       properties:
         language:
           type: string
           description: >-
-            Optional BCP-47 tag, passed to the service unchanged; omitted or
-            "und" requests detection; selected languages require revised
-            hypotheses. Append also accepts "und" as equivalent to omission.
+            Required BCP-47 tag of the spoken language, passed to the service
+            unchanged; an omitted tag or "und" is rejected with
+            `invalid_input`.
         mode:
           $ref: '#/components/schemas/transcriptionMode'
         outputContract:
@@ -408,8 +407,8 @@ components:
             empty or whitespace-only terms and preserves term order and text,
             joining them with ", " before composition into the packaged mode
             prompt. The model's UTF-8 caller-context byte budget includes the
-            separators. Per-word weights are not supported. Nonempty lists
-            require revised-hypotheses sessions; a scalar string is invalid.
+            separators. Per-word weights are not supported. A scalar string is
+            invalid.
 
     streamingOutputContract:
       type: string

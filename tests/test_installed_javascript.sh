@@ -50,7 +50,7 @@ if node --input-type=module -e 'import { readFileSync } from "node:fs"; process.
 import { SpeechWebSocketRequestSchema, StreamingOutputContract } from '@rimelabs/api';
 import type { SpeechWebSocketRequest } from '@rimelabs/api';
 const speechRequest: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
-  payload: { case: 'start', value: { outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
+  payload: { case: 'start', value: { language: 'en', outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
 });
 // @ts-expect-error Audio must use bytes.
 const invalidSpeech: SpeechWebSocketRequest = { ...speechRequest, payload: { case: 'audio', value: 'audio' } };
