@@ -1,0 +1,29 @@
+schema/speech_to_text.asyncapi.yaml
+  s_53c724689512c1::t_1c2857a0140574 32-33,42,44-50,257,265,330,383-386,391-393,410-411
+sync/README.md
+  s_53c724689512c1::t_103d2844636557 42
+tests/javascript_test.mjs
+  s_53c724689512c1::t_103d2844636557 52
+schema/rime/speech_to_text.proto
+  s_53c724689512c1::t_1c2857a0140574 6,24,36-38,55-56,61-62,78,84,92-96,113-115,123-125,147-149,153-156,158-160,167,185-186,188-190,227-228,236-237
+tests/fixtures.json
+  s_53c724689512c1::t_103d2844636557 190,194
+tests/test_installed_javascript.sh
+  s_53c724689512c1::t_103d2844636557 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8d42cb40a97211e675ac950c9b700466a75e7036",
+  "prompts": {},
+  "sessions": {
+    "s_53c724689512c1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0eda9-e528-7de2-86f3-e5dfb94a499b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
