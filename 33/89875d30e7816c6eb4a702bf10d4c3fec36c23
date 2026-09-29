@@ -1,0 +1,33 @@
+tests/BUILD.bazel
+  s_602cd8bca5d2b1::t_d1f8fa9189c303 5-11
+  s_602cd8bca5d2b1::t_08fe260dc81d90 4
+tools/release.py
+  s_602cd8bca5d2b1::t_0fa79039739542 12,22-23,399-400,404,406-449
+  s_602cd8bca5d2b1::t_bc19890b984c8f 529-547
+tests/registry_verification_test.py
+  s_602cd8bca5d2b1::t_d970c5409f1de9 1-61,63-121,123-127,129,131-137
+  s_602cd8bca5d2b1::t_9648396303e6a5 62,122,128,130
+RELEASING.md
+  s_602cd8bca5d2b1::t_56fb45708f357d 152
+  s_602cd8bca5d2b1::t_0fa79039739542 146-151
+tests/release_automation_test.py
+  s_602cd8bca5d2b1::t_10310d4389bf15 316-318,330-335,344-346,376-378
+  s_602cd8bca5d2b1::t_a891bc151e5be9 386-391,420
+  s_602cd8bca5d2b1::t_02b7b57f303344 379
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3389875d30e7816c6eb4a702bf10d4c3fec36c23",
+  "prompts": {},
+  "sessions": {
+    "s_602cd8bca5d2b1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0eb40-cb58-72e2-ab0f-6c06ee8d327e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
