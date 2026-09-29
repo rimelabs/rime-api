@@ -1,0 +1,95 @@
+sync/README.md
+  s_602cd8bca5d2b1::t_3f5fd4c45c3eb0 26-27,92-112
+schema/BUILD.bazel
+  s_602cd8bca5d2b1::t_7fbc3871d780df 1-2,4-10
+requirements.txt
+  s_602cd8bca5d2b1::t_ed4a608692972f 3-6,68
+BUILD.bazel
+  s_602cd8bca5d2b1::t_7fbc3871d780df 22,54
+  s_602cd8bca5d2b1::t_f6c89bd9d61533 2,11-16,50
+tools/assemble_schema.py
+  s_602cd8bca5d2b1::t_7fbc3871d780df 1-8,10-17,19,21-39,41
+  s_602cd8bca5d2b1::t_069b2a2b8c206a 9
+  s_602cd8bca5d2b1::t_d32d80eb34b4b2 18,20,40
+packages/README.md
+  s_602cd8bca5d2b1::t_3f5fd4c45c3eb0 19-21
+tools/check_compatibility.py
+  s_602cd8bca5d2b1::t_3f5fd4c45c3eb0 83
+  s_602cd8bca5d2b1::t_753ea0176a1c2e 30-33,51-53,55
+  s_602cd8bca5d2b1::t_f15d8e509403cc 16-17
+  s_602cd8bca5d2b1::t_e3a709875fc79b 1-15,18-27,34-50,56-77,79-82,84-118,120
+  s_602cd8bca5d2b1::t_d23948aba523fa 29
+  s_602cd8bca5d2b1::t_f8b3199d48eb4e 28,54,78,119
+tools/build_packages.py
+  s_602cd8bca5d2b1::t_2f3090dcd06c4c 59,70,84,98,110-118,150
+schema/rime/BUILD.bazel
+  s_602cd8bca5d2b1::t_7fbc3871d780df 8-11
+tests/test_installed_javascript.sh
+  s_602cd8bca5d2b1::t_ba3101d4f4308a 24,27
+tools/BUILD.bazel
+  s_602cd8bca5d2b1::t_d1d9d0439581f0 7-19
+  s_602cd8bca5d2b1::t_7fbc3871d780df 6,20-25
+tests/compatibility_test.py
+  s_602cd8bca5d2b1::t_e589c35f44c94a 1-24,26-49,51-64,66,69-77
+  s_602cd8bca5d2b1::t_3f5fd4c45c3eb0 25
+  s_602cd8bca5d2b1::t_6c7dd2f9ad1d49 50,65,67-68
+NOTICE
+  s_602cd8bca5d2b1::t_f6c89bd9d61533 3-6
+tests/copybara_test.py
+  s_602cd8bca5d2b1::t_069b2a2b8c206a 78-86
+tests/javascript_test.mjs
+  s_602cd8bca5d2b1::t_ba3101d4f4308a 14,18
+packages/packages.bzl
+  s_602cd8bca5d2b1::t_7fbc3871d780df 5-30,40,50,66
+tools/check_compatibility.sh
+  s_602cd8bca5d2b1::t_e3a709875fc79b 6-8,11-12,15-19
+  s_602cd8bca5d2b1::t_edc331cea4d176 10,13
+  s_602cd8bca5d2b1::t_f756440b7c3f16 9,14
+packages/python.toml
+  s_602cd8bca5d2b1::t_f6c89bd9d61533 12,29
+  s_602cd8bca5d2b1::t_2f3090dcd06c4c 14
+MODULE.bazel
+  s_602cd8bca5d2b1::t_7fbc3871d780df 10
+  s_602cd8bca5d2b1::t_9af271b7c9350c 3
+tests/BUILD.bazel
+  s_602cd8bca5d2b1::t_2f3090dcd06c4c 84,87
+  s_602cd8bca5d2b1::t_1d8b1f5e0c2509 4-9,11-12,15-19
+  s_602cd8bca5d2b1::t_12043e210bcc1e 10,13-14,85-86
+.github/workflows/check.yaml
+  s_602cd8bca5d2b1::t_d1d9d0439581f0 31,34,36-39
+schema/google/rpc/BUILD.bazel
+  s_602cd8bca5d2b1::t_7fbc3871d780df 1-16
+.github/workflows/sync.yaml
+  s_602cd8bca5d2b1::t_3f5fd4c45c3eb0 76-77
+packages/javascript.json
+  s_602cd8bca5d2b1::t_f6c89bd9d61533 8
+tests/packages_test.py
+  s_602cd8bca5d2b1::t_2f3090dcd06c4c 21-23,71
+  s_602cd8bca5d2b1::t_ba3101d4f4308a 40-41,43,46-47,49-50,52
+  s_602cd8bca5d2b1::t_ff1f18c5c06840 39,42,48,51,72
+tests/fixtures.json
+  s_602cd8bca5d2b1::t_3b684f6e861a05 4-7,12-15,20-22,27-29,34-41,48-50,55-107
+  s_602cd8bca5d2b1::t_edc331cea4d176 108
+MODULE.bazel.lock
+  s_602cd8bca5d2b1::t_fadf1e91ec0e70 120-123,1319-1322
+pyproject.toml
+  s_602cd8bca5d2b1::t_6404239ed8db23 10
+uv.lock
+  s_602cd8bca5d2b1::t_17b12af41aab1f 5-16,132,140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6dd29f593edeca3a0f0820c85d152136033d848d",
+  "prompts": {},
+  "sessions": {
+    "s_602cd8bca5d2b1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0eb40-cb58-72e2-ab0f-6c06ee8d327e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
