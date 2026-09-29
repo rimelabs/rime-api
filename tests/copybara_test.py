@@ -75,6 +75,15 @@ class CopybaraTest(unittest.TestCase):
                 f"--last-rev={baseline}",
             )
             run(*command, expected=(4,))
+            (origin / "unrelated.txt").write_text("No public API change\n")
+            commit(origin, "Change only an unrelated file")
+            run(*command, expected=(4,))
+            self.assertEqual(
+                run(
+                    "git", "branch", "--list", "sync/public-api", directory=destination
+                ),
+                "",
+            )
             (origin / "interfaces/rime/text_to_speech.proto").write_text(
                 'syntax = "proto3";\nmessage Added {}\n'
             )

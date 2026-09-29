@@ -56,6 +56,7 @@ def build(arguments: argparse.Namespace) -> None:
     distributions = output / "dist"
     distributions.mkdir(parents=True)
     asyncapi = arguments.asyncapi.absolute()
+    schema_directory = arguments.schema_workspace.absolute() / "schema"
     source_record = {
         "version": version,
         "schema": "rime/text_to_speech.proto",
@@ -66,8 +67,7 @@ def build(arguments: argparse.Namespace) -> None:
         },
     }
     for package in (python, javascript):
-        (package / "schema/rime").mkdir(parents=True)
-        shutil.copyfile(source, package / "schema/rime/text_to_speech.proto")
+        shutil.copytree(schema_directory, package / "schema")
         shutil.copyfile(asyncapi, package / "schema/text_to_speech.asyncapi.yaml")
         shutil.copyfile(templates / "README.md", package / "README.md")
         for license_file in arguments.license_file:
@@ -81,6 +81,7 @@ def build(arguments: argparse.Namespace) -> None:
     compile_proto(
         [
             f"-Irime_api={source.parent}",
+            f"-I{schema_directory}",
             f"--python_out={python_sources}",
             f"--pyi_out={python_sources}",
             "rime_api/text_to_speech.proto",
@@ -94,7 +95,7 @@ def build(arguments: argparse.Namespace) -> None:
         (templates / "python.toml").read_text().replace("@VERSION@", version)
     )
 
-    include_paths = [f"-I{proto_root}"]
+    include_paths = [f"-I{schema_directory}", f"-I{proto_root}"]
     include_paths.extend(f"-I{path.absolute()}" for path in arguments.proto_path)
     for directory, style in (("esm", "module"), ("commonjs", "legacy_commonjs")):
         generated = javascript / directory
@@ -106,6 +107,15 @@ def build(arguments: argparse.Namespace) -> None:
                 f"--es_out={generated}",
                 f"--es_opt=target=js+dts,import_extension=js,js_import_style={style}",
                 "rime/text_to_speech.proto",
+                # Google well-known types come from @bufbuild/protobuf. Other
+                # imported definitions need generated files inside this package.
+                *[
+                    path.relative_to(schema_directory).as_posix()
+                    for path in sorted(schema_directory.rglob("*.proto"))
+                    if not path.relative_to(schema_directory)
+                    .as_posix()
+                    .startswith(("google/protobuf/", "rime/"))
+                ],
             ]
         )
         exports = "export * from './rime/text_to_speech_pb.js';\n"
@@ -137,6 +147,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--proto-root", type=Path, required=True)
+    parser.add_argument("--schema-workspace", type=Path, required=True)
     parser.add_argument("--proto-path", type=Path, action="append", default=[])
     parser.add_argument("--plugin", type=Path, required=True)
     parser.add_argument("--templates", type=Path, required=True)

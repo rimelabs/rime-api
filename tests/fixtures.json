@@ -1,37 +1,110 @@
 [
   {
     "message": "WebSocketRequest",
-    "json": { "contextId": "turn-42", "text": "hello" },
+    "json": {
+      "contextId": "turn-42",
+      "text": "hello"
+    },
     "hex": "0a077475726e2d3432220568656c6c6f"
   },
   {
     "message": "WebSocketResponse",
-    "json": { "contextId": "turn-42", "audio": "AQI=" },
+    "json": {
+      "contextId": "turn-42",
+      "audio": "AQI="
+    },
     "hex": "0a077475726e2d343222020102"
   },
   {
     "message": "WebSocketRequest",
-    "json": { "end": {} },
+    "json": {
+      "end": {}
+    },
     "hex": "2a00"
   },
   {
     "message": "WebSocketRequest",
-    "json": { "cancel": {} },
+    "json": {
+      "cancel": {}
+    },
     "hex": "3200"
   },
   {
     "message": "WebSocketResponse",
-    "json": { "ready": { "protocol": 1, "languages": ["en"] } },
+    "json": {
+      "ready": {
+        "protocol": 1,
+        "languages": [
+          "en"
+        ]
+      }
+    },
     "hex": "120608011202656e"
   },
   {
     "message": "WebSocketRequest",
     "json": {
       "start": {
-        "audioParameters": { "samplingRate": 0 },
+        "audioParameters": {
+          "samplingRate": 0
+        },
         "splitStrategy": "SPLIT_STRATEGY_NONE"
       }
     },
     "hex": "1a062a0210003002"
+  },
+  {
+    "message": "SpanTimestamp",
+    "requires": "SpanTimestamp",
+    "json": {
+      "text": "hi",
+      "start": "0s",
+      "end": "1s"
+    },
+    "hex": "0a02686912001a020801"
+  },
+  {
+    "message": "Timestamps",
+    "requires": "Timestamps",
+    "json": {
+      "status": {
+        "code": 14,
+        "message": "busy"
+      }
+    },
+    "hex": "0a08080e120462757379"
+  },
+  {
+    "message": "SynthesisResponseStream",
+    "requires": "Timestamps",
+    "json": {
+      "trailer": {
+        "timestamps": {
+          "spans": [
+            {
+              "text": "hi",
+              "start": "0s",
+              "end": "1s"
+            }
+          ]
+        }
+      }
+    },
+    "hex": "120e0a0c120a0a02686912001a020801"
+  },
+  {
+    "message": "WebSocketResponse",
+    "requires": "Timestamps",
+    "json": {
+      "done": {
+        "timestamps": {
+          "status": {
+            "code": 14,
+            "message": "busy"
+          }
+        }
+      }
+    },
+    "hex": "2a0c0a0a0a08080e120462757379"
   }
 ]

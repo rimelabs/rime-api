@@ -18,7 +18,9 @@ class PackageTest(unittest.TestCase):
         distribution = metadata.metadata("rime-api")
         self.assertEqual(distribution["Requires-Python"], ">=3.10")
         dependencies = distribution.get_all("Requires-Dist")
-        self.assertEqual(dependencies, ["protobuf>=5.29.6"])
+        self.assertCountEqual(
+            dependencies, ["protobuf>=5.29.6", "googleapis-common-protos>=1.70.0"]
+        )
         source = json.loads(
             resources.files("rime_api").joinpath("SOURCE.json").read_text()
         )
@@ -34,8 +36,20 @@ class PackageTest(unittest.TestCase):
         )
 
     def test_shared_fixtures(self):
+        source = (
+            resources.files("rime_api")
+            .joinpath("schema/rime/text_to_speech.proto")
+            .read_text()
+        )
         for fixture in fixtures:
             with self.subTest(fixture=fixture):
+                # A support PR also builds the older, unsynced schema. Select
+                # new fixtures from the source, never from generated exports.
+                if (
+                    fixture.get("requires")
+                    and f"message {fixture['requires']} {{" not in source
+                ):
+                    continue
                 message_type = getattr(proto, fixture["message"])
                 message = json_format.ParseDict(fixture["json"], message_type())
                 self.assertEqual(message.SerializeToString().hex(), fixture["hex"])
@@ -54,10 +68,8 @@ class PackageTest(unittest.TestCase):
         self.assertEqual(service.full_name, "rime.TextToSpeech")
         self.assertTrue(service.methods_by_name["SynthesizeStreaming"].client_streaming)
         self.assertEqual(
-            proto.SynthesisRequest.DESCRIPTOR.fields_by_name[
-                "arcana_parameters"
-            ].number,
-            7,
+            service.methods_by_name["Synthesize"].input_type,
+            proto.SynthesisRequest.DESCRIPTOR,
         )
 
     def test_optional_presence_and_oneof(self):

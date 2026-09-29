@@ -3,6 +3,26 @@ load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 
+py_binary(
+    name = "check_compatibility",
+    srcs = ["check_compatibility.py"],
+    legacy_create_init = 0,
+    visibility = ["//visibility:public"],
+)
+
+py_library(
+    name = "compatibility",
+    srcs = ["check_compatibility.py"],
+    visibility = ["//tests:__pkg__"],
+)
+
+py_binary(
+    name = "assemble_schema",
+    srcs = ["assemble_schema.py"],
+    legacy_create_init = 0,
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "release",
     srcs = ["release.py"],

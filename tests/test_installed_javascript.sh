@@ -21,8 +21,10 @@ import { createRequire } from 'node:module';
 import * as esm from '@rimelabs/api';
 import { fromBinary, fromJson, toBinary, toJson } from '@bufbuild/protobuf';
 const commonjs = createRequire(import.meta.url)('@rimelabs/api');
+const source = readFileSync('node_modules/@rimelabs/api/schema/rime/text_to_speech.proto', 'utf8');
 for (const definitions of [esm, commonjs]) {
   for (const fixture of JSON.parse(readFileSync('fixtures.json', 'utf8'))) {
+    if (fixture.requires && !source.includes(`message ${fixture.requires} {`)) continue;
     const schema = definitions[`${fixture.message}Schema`];
     assert.equal(Buffer.from(toBinary(schema, fromJson(schema, fixture.json))).toString('hex'), fixture.hex);
     assert.deepEqual(toJson(schema, fromBinary(schema, Buffer.from(fixture.hex, 'hex'))), fixture.json);

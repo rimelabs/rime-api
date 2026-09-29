@@ -1,4 +1,5 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library")
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
 load("@npm//:@bufbuild/protoc-gen-es/package_json.bzl", protoc_gen_es = "bin")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("//packages:packages.bzl", "api_packages")
@@ -7,11 +8,18 @@ npm_link_all_packages(name = "node_modules")
 
 protoc_gen_es.protoc_gen_es_binary(name = "protoc_gen_es")
 
+copy_file(
+    name = "protobuf_license",
+    src = "@protobuf//:LICENSE",
+    out = "PROTOBUF_LICENSE",
+)
+
 exports_files([
     ".github/workflows/sync.yaml",
     "LICENSE",
     "NOTICE",
     "VERSION",
+    "buf.yaml",
     "copy.bara.sky",
 ])
 
@@ -39,9 +47,11 @@ api_packages(
     license_files = [
         "LICENSE",
         "NOTICE",
+        ":protobuf_license",
     ],
     plugin = ":protoc_gen_es",
     proto = "//schema/rime:text_to_speech_proto",
+    schema_workspace = "//schema:workspace",
     templates = [
         "//packages:README.md",
         "//packages:python.toml",

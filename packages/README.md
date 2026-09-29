@@ -16,8 +16,9 @@ request = proto.WebSocketRequest(context_id='turn-42', text='Hello.')
 encoded = request.SerializeToString()
 ```
 
-Python 3.10 or newer is required. The package includes type stubs. Its only
-runtime dependency is `protobuf>=5.29.6`. It does not require gRPC.
+Python 3.10 or newer is required. The package includes type stubs. Runtime
+dependencies are `protobuf>=5.29.6` and `googleapis-common-protos>=1.70.0`.
+It does not require gRPC.
 
 ## JavaScript and TypeScript
 

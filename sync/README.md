@@ -23,7 +23,8 @@ The fixed public commit message and PR title are
 Release Please without copying private source commit descriptions. Review
 the proposed version and public changelog in the separate release PR. Use
 `fix:` for corrections and `feat!:` for breaking changes when preparing a
-squash commit, and retain `GitOrigin-RevId`. Compatibility checks still apply.
+squash commit, and retain `GitOrigin-RevId`. Schema validation and package tests must pass. Compatibility changes are
+reported for release review and do not stop sync.
 
 ## Initial source revision
 
@@ -88,9 +89,24 @@ The package build and sync work without changes to `rime`. The old package PR
 can close once this replacement is reviewed. Keep any desired Arcana
 deprecation or license-header changes in a separate schema PR.
 
-A small compatibility workflow in `rime` is recommended. It should run the
-existing Bazel Buf tool on the public schema against the source PR base.
-That catches breaking changes before the engine merges them. The checks in
-this repository catch them again when the schema sync PR arrives.
-The file `rime-compatibility.patch` supplies that workflow for `rime/main`.
-It needs no package builders, Python or npm dependencies, or release tooling.
+## Validation and compatibility reports
+
+`rime` is authoritative, including intentional breaking changes. Copybara exports
+only the two files listed above. Unrelated source changes produce no sync PR.
+Do not change a copied schema here to preserve an older client API.
+
+`tools/check_compatibility.sh` validates the schema with dependencies from the
+Bazel build graph. It compares the public Protobuf API with the PR base and the
+latest reachable release. Breaking changes produce a warning, a job summary,
+and an `api-compatibility` artifact. Invalid schemas, missing imports, tool
+errors, and failed package tests still fail CI. Review the AsyncAPI diff too;
+Buf checks only Protobuf compatibility.
+
+New source imports may require dependency and package generation changes here.
+The build pins Google API definitions and includes the transitive schema files.
+Python uses `googleapis-common-protos`; JavaScript includes generated Google RPC
+types and uses the well-known types from `@bufbuild/protobuf`.
+
+Before merging a sync PR, review its compatibility report. Use an appropriate
+release version and describe required client changes in the release notes.
+A compatibility report does not select or publish a release automatically.

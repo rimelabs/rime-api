@@ -9,9 +9,9 @@ description = "Generated protocol definitions for Rime text-to-speech"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-license-files = ["LICENSE", "NOTICE"]
+license-files = ["LICENSE", "NOTICE", "PROTOBUF_LICENSE"]
 authors = [{ name = "Rime" }]
-dependencies = ["protobuf>=5.29.6"]
+dependencies = ["protobuf>=5.29.6", "googleapis-common-protos>=1.70.0"]
 
 [project.urls]
 Documentation = "https://docs.rime.ai"
@@ -26,4 +26,4 @@ packages = ["src/rime_api"]
 "schema" = "rime_api/schema"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "schema", "SOURCE.json", "pyproject.toml", "README.md", "LICENSE", "NOTICE"]
+include = ["src", "schema", "SOURCE.json", "pyproject.toml", "README.md", "LICENSE", "NOTICE", "PROTOBUF_LICENSE"]
