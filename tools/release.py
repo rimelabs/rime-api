@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tarfile
 import time
 from urllib.error import HTTPError
@@ -18,6 +19,8 @@ import zipfile
 
 
 REPOSITORY = "rimelabs/rime-api"
+PUBLICATION_WAIT_SECONDS = 600
+PUBLICATION_POLL_SECONDS = 10
 
 
 def require(condition, message):
@@ -393,32 +396,57 @@ def check_registry(registry, directory, download):
         "Prepared archive checksum differs",
     )
     names = archive_names(version)[registry]
-    for attempt in range(12 if download else 1):
+    deadline = time.monotonic() + PUBLICATION_WAIT_SECONDS
+    while True:
         published = compare_registry(
             registry, registry_metadata(registry, version), files, version
         )
-        if len(published) == len(names) or not download:
+        if not download:
             break
-        if attempt < 11:
-            time.sleep(10)
-    if download:
-        require(len(published) == len(names), "Published files are not yet available")
-        download.mkdir(parents=True, exist_ok=False)
-        for name, url in published.items():
-            expected_host = (
-                "registry.npmjs.org" if registry == "npm" else "files.pythonhosted.org"
-            )
-            require(
-                urlparse(url).scheme == "https"
-                and urlparse(url).hostname == expected_host,
-                "Unexpected distribution host",
-            )
-            data = fetch(url)
-            require(
-                data == files[name],
-                "Downloaded registry archive differs from tested archive",
-            )
-            (download / name).write_bytes(data)
+        verified = {}
+        if len(published) == len(names):
+            for name, url in published.items():
+                expected_host = (
+                    "registry.npmjs.org"
+                    if registry == "npm"
+                    else "files.pythonhosted.org"
+                )
+                require(
+                    urlparse(url).scheme == "https"
+                    and urlparse(url).hostname == expected_host,
+                    "Unexpected distribution host",
+                )
+                try:
+                    data = fetch(url)
+                except HTTPError as error:
+                    # Metadata can become visible before the archive itself.
+                    if error.code != 404:
+                        raise
+                    break
+                require(
+                    data == files[name],
+                    "Downloaded registry archive differs from tested archive",
+                )
+                verified[name] = data
+        if len(verified) == len(names):
+            download.mkdir(parents=True, exist_ok=False)
+            for name, data in verified.items():
+                (download / name).write_bytes(data)
+            break
+        remaining = deadline - time.monotonic()
+        require(
+            remaining > 0,
+            f"Published {registry} files for {version} are not available after "
+            f"{PUBLICATION_WAIT_SECONDS} seconds. Retry the release with original "
+            f"check run {record['run_id']} and version {version}.",
+        )
+        print(
+            f"Waiting for {registry} {version} publication; "
+            f"{remaining:.0f} seconds remain.",
+            file=sys.stderr,
+            flush=True,
+        )
+        time.sleep(min(PUBLICATION_POLL_SECONDS, remaining))
     print(
         f"{registry}_publish_required={'false' if len(published) == len(names) else 'true'}"
     )
@@ -498,32 +526,26 @@ def finalize_release(directory):
                 break
         notes_path = directory / "release-notes.md"
         notes_path.write_text(notes)
-        command(
-            "gh",
-            "release",
-            "create",
-            tag,
-            "--repo",
-            REPOSITORY,
-            "--verify-tag",
-            "--target",
-            commit,
-            "--draft",
-            "--title",
-            f"Rime API {version}",
-            "--notes-file",
-            str(notes_path),
+        # Use the creation response; the release list can lag behind creation.
+        existing = json.loads(
+            command(
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                f"repos/{REPOSITORY}/releases",
+                "-f",
+                f"tag_name={tag}",
+                "-f",
+                f"target_commitish={commit}",
+                "-f",
+                f"name=Rime API {version}",
+                "-F",
+                "draft=true",
+                "-F",
+                f"body=@{notes_path}",
+            )
         )
-        # The REST tag lookup excludes drafts. The authenticated list includes them.
-        existing = next(
-            (
-                item
-                for item in github_pages("releases?per_page=100")
-                if item["tag_name"] == tag
-            ),
-            None,
-        )
-        require(existing is not None, "The newly created draft release was not found")
     assets = {asset["name"]: asset for asset in existing["assets"]}
     for name in [*record["sha256"], "RELEASE.json"]:
         path = directory / name

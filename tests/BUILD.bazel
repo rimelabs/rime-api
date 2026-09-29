@@ -2,6 +2,14 @@ load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@rules_python//python:py_test.bzl", "py_test")
 
 py_test(
+    name = "registry_verification_test",
+    size = "small",
+    srcs = ["registry_verification_test.py"],
+    legacy_create_init = 0,
+    deps = ["//tools:release"],
+)
+
+py_test(
     name = "compatibility_test",
     size = "small",
     srcs = ["compatibility_test.py"],

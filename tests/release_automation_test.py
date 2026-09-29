@@ -313,7 +313,9 @@ class ReleaseAutomationTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "different bytes"):
                 release.published_release(self.directory)
 
-    def finalize(self, tag_target=None, existing=None, asset_contents=None):
+    def finalize(
+        self, tag_target=None, existing=None, asset_contents=None, draft_visible=True
+    ):
         commands = []
 
         def command(*arguments):
@@ -325,6 +327,12 @@ class ReleaseAutomationTest(unittest.TestCase):
                 return b""
             if arguments[:2] == ("gh", "api") and "assets/" in arguments[2]:
                 return asset_contents
+            if (
+                arguments[:2] == ("gh", "api")
+                and f"repos/{release.REPOSITORY}/releases" in arguments
+                and "POST" in arguments
+            ):
+                return json.dumps(draft).encode()
             return b""
 
         draft = {"tag_name": f"v{self.version}", "draft": True, "assets": []}
@@ -333,7 +341,9 @@ class ReleaseAutomationTest(unittest.TestCase):
             self.assertEqual(path, "releases?per_page=100")
             if existing:
                 return [existing]
-            if any(item[:3] == ("gh", "release", "create") for item in commands):
+            if draft_visible and any(
+                item[:3] == ("gh", "release", "create") for item in commands
+            ):
                 return [draft]
             return []
 
@@ -363,12 +373,22 @@ class ReleaseAutomationTest(unittest.TestCase):
             release.finalize_release(self.directory)
         return commands
 
+    def test_finalizes_when_created_draft_is_absent_from_release_list(self):
+        commands = self.finalize(draft_visible=False)
+        self.assertTrue(any("--draft=false" in item for item in commands))
+
     def test_creates_tag_at_tested_commit_and_publishes_after_assets(self):
         commands = self.finalize()
         create_tag = next(
             item for item in commands if f"repos/{release.REPOSITORY}/git/refs" in item
         )
         self.assertIn(f"sha={self.commit}", create_tag)
+        create_release = next(
+            item for item in commands if f"repos/{release.REPOSITORY}/releases" in item
+        )
+        self.assertIn(f"tag_name=v{self.version}", create_release)
+        self.assertIn(f"target_commitish={self.commit}", create_release)
+        self.assertIn("draft=true", create_release)
         uploads = [
             index
             for index, item in enumerate(commands)
@@ -397,7 +417,7 @@ class ReleaseAutomationTest(unittest.TestCase):
         }
         commands = self.finalize(self.commit, existing, self.files[name])
         self.assertFalse(
-            any(item[:3] == ("gh", "release", "create") for item in commands)
+            any(f"repos/{release.REPOSITORY}/releases" in item for item in commands)
         )
         self.assertFalse(
             any(

@@ -143,6 +143,13 @@ release PR's exact merged commit, so a correction commit uses manual dispatch.
 If a package was already published, keep its contents and recover that release
 first. Publish source corrections under a new version.
 
+Registry verification waits up to ten minutes for complete version metadata
+and downloadable archives. Progress appears in the job log. A successful upload
+can remain unavailable while the registry processes it. A timeout does not mean
+the upload failed. Retry with the original check run ID and version after the
+files become available. Matching published files are verified and skipped;
+checksum conflicts and access errors still stop the release immediately.
+
 If publication or finalization fails:
 
 1. Fix the cause, such as a trusted publisher setting.
