@@ -330,6 +330,9 @@ components:
             $ref: '#/components/schemas/contextId'
           done:
             type: object
+            properties:
+              timestamps:
+                $ref: '#/components/schemas/timestamps'
 
     cancelled:
       name: cancelled
@@ -423,24 +426,6 @@ components:
           description: >-
             Controls how input text is split before synthesis. Defaults to
             SPLIT_STRATEGY_SENTENCE when unset.
-        arcanaParameters:
-          type: object
-          properties:
-            repetitionPenalty: {type: number}
-            topP: {type: number}
-            temperature: {type: number}
-            maxTokens: {type: integer}
-            presencePenalty: {type: number}
-            frequencyPenalty: {type: number}
-            topK: {type: integer}
-            minP: {type: number}
-            seed:
-              type: string
-              description: int64; a string in proto3 JSON.
-            minTokens: {type: integer}
-            detokenize: {type: boolean}
-            skipSpecialTokens: {type: boolean}
-            spacesBetweenSpecialTokens: {type: boolean}
         codaParameters:
           type: object
           properties:
@@ -459,3 +444,37 @@ components:
               type: array
               items: {type: number}
             saveOovs: {type: boolean}
+        timestamps:
+          type: object
+          description: >-
+            Timestamps of the spoken spans of the synthesized audio, reported
+            in `done.timestamps` after all audio. Off unless requested; never
+            delays or fails the audio.
+          properties:
+            enable: {type: boolean}
+
+    timestamps:
+      type: object
+      description: >-
+        How the alignment branch settled. `status` is a `google.rpc.Status`
+        whose `code` is a `google.rpc.Code`; only `OK` (0) carries spans.
+        Spans are those of the text the talker spoke (the request text after
+        normalization: whitespace-separated words, or morphemes for a
+        language written without spaces); offsets are durations from the
+        start of the audio at its native rate, before `timeScaleFactor`, in
+        the proto3 JSON form ("1.500s").
+      properties:
+        status:
+          type: object
+          properties:
+            code: {type: integer, description: A google.rpc.Code; 0 is OK.}
+            message: {type: string}
+            details: {type: array, items: {type: object}}
+        spans:
+          type: array
+          items:
+            type: object
+            properties:
+              text: {type: string}
+              start: {type: string, example: '0.160s'}
+              end: {type: string, example: '0.240s'}
