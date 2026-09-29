@@ -73,7 +73,8 @@ jobs:
           Update the public Protobuf and AsyncAPI definitions from `rimelabs/rime`.
 
           Copybara records the source revision in the commit. Package tests and
-          compatibility checks must pass before merge. Package publication is separate.
+          schema validation must pass before merge. Review the compatibility report
+          for breaking changes. Package publication is separate.
           BODY
             gh pr create --head sync/public-api --base main \
               --title 'feat(api): sync public API definitions' --body-file /tmp/rime-api-sync-pr.md

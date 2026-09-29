@@ -5,4 +5,8 @@ proto_library(
     srcs = ["text_to_speech.proto"],
     strip_import_prefix = "/schema",
     visibility = ["//visibility:public"],
+    deps = [
+        "//schema/google/rpc:status_proto",
+        "@protobuf//:duration_proto",
+    ],
 )

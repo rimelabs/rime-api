@@ -1,0 +1,16 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+
+copy_file(
+    name = "status_source",
+    src = "@googleapis//google/rpc:status.proto",
+    out = "status.proto",
+)
+
+proto_library(
+    name = "status_proto",
+    srcs = ["status.proto"],
+    strip_import_prefix = "/schema",
+    visibility = ["//visibility:public"],
+    deps = ["@protobuf//:any_proto"],
+)

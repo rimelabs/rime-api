@@ -1,6 +1,22 @@
 load("@aspect_rules_js//js:defs.bzl", "js_test")
 load("@rules_python//python:py_test.bzl", "py_test")
 
+py_test(
+    name = "compatibility_test",
+    size = "small",
+    srcs = ["compatibility_test.py"],
+    args = [
+        "$(rootpath @rules_buf_toolchains//:buf)",
+        "$(rootpath //schema:workspace)",
+    ],
+    data = [
+        "//schema:workspace",
+        "@rules_buf_toolchains//:buf",
+    ],
+    legacy_create_init = 0,
+    deps = ["//tools:compatibility"],
+)
+
 js_test(
     name = "release_publication_workflow_test",
     size = "small",
@@ -65,7 +81,10 @@ py_test(
         "//:packages",
     ],
     legacy_create_init = 0,
-    deps = ["@pip//protobuf"],
+    deps = [
+        "@pip//googleapis_common_protos",
+        "@pip//protobuf",
+    ],
 )
 
 js_test(

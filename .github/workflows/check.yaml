@@ -28,10 +28,15 @@ jobs:
           diff <(sed '/^#/d' requirements.txt) <(sed '/^#/d' /tmp/rime-api-requirements.txt)
       - name: Check format
         run: bazel run //:format_check
-      - name: Check schema compatibility
+      - name: Validate schemas and report compatibility
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          COMPATIBILITY_REPORT: ${{ runner.temp }}/api-compatibility.md
         run: bash tools/check_compatibility.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: api-compatibility
+          path: ${{ runner.temp }}/api-compatibility.md
       - name: Build and test
         run: |
           bazel test //tests/...

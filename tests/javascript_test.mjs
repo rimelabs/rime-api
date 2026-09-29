@@ -11,9 +11,11 @@ const esm = await import(pathToFileURL(resolve(directory, "esm/index.js")));
 const require = createRequire(import.meta.url);
 const commonjs = require(resolve(directory, "commonjs/index.js"));
 const fixtures = JSON.parse(await readFile(fixturePath, "utf8"));
+const source = await readFile(resolve(directory, "schema/rime/text_to_speech.proto"), "utf8");
 
 for (const definitions of [esm, commonjs]) {
   for (const fixture of fixtures) {
+    if (fixture.requires && !source.includes(`message ${fixture.requires} {`)) continue;
     const schema = definitions[`${fixture.message}Schema`];
     const message = fromJson(schema, fixture.json);
     assert.equal(
