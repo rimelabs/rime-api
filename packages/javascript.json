@@ -1,7 +1,7 @@
 {
   "name": "@rimelabs/api",
   "version": "@VERSION@",
-  "description": "Generated protocol definitions for Rime text-to-speech",
+  "description": "Generated protocol definitions for Rime text-to-speech and speech-to-text",
   "type": "module",
   "sideEffects": false,
   "repository": {"type": "git", "url": "git+https://github.com/rimelabs/rime-api.git"},

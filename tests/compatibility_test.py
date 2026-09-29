@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.check_compatibility import compare
+from tools.check_compatibility import check, compare
 
 BUF = Path(sys.argv.pop(1)).resolve()
 WORKSPACE = Path(sys.argv.pop(1)).resolve()
@@ -71,6 +71,50 @@ class CompatibilityTest(unittest.TestCase):
                 )
                 with self.assertRaises(RuntimeError):
                     compare(BUF, self.current, self.baseline)
+
+    def test_stt_baseline_addition_change_and_deletion(self):
+        repository = self.root / "repository"
+        repository.mkdir()
+
+        def git(*arguments):
+            return subprocess.check_output(
+                ["git", *arguments], cwd=repository, text=True, stderr=subprocess.PIPE
+            ).strip()
+
+        git("init", "--initial-branch=main")
+        git("config", "user.name", "Test Author")
+        git("config", "user.email", "test@example.invalid")
+        shutil.copytree(self.current / "schema/rime", repository / "schema/rime")
+        speech_path = "schema/rime/speech_to_text.proto"
+        (repository / speech_path).unlink()
+        git("add", ".")
+        git("commit", "-m", "TTS baseline")
+        report = self.root / "report.md"
+        (self.current / "schema").chmod(0o555)
+        (self.current / "schema/rime").chmod(0o555)
+        try:
+            check(BUF, self.current, repository, "HEAD", report)
+        finally:
+            (self.current / "schema").chmod(0o755)
+            (self.current / "schema/rime").chmod(0o755)
+        self.assertIn("No breaking Protobuf changes", report.read_text())
+
+        (repository / speech_path).write_text(
+            'syntax = "proto3"; package rime; message TranscriptionRequest { bytes audio = 1; }\n'
+        )
+        git("add", ".")
+        git("commit", "-m", "Add STT")
+        # A release tag must also restore STT from its own revision.
+        git("tag", "v0.1.0")
+        git("commit", "--allow-empty", "-m", "Later commit")
+        (self.current / speech_path).write_text(
+            'syntax = "proto3"; package rime; message TranscriptionRequest { reserved 1; }\n'
+        )
+        check(BUF, self.current, repository, "", report)
+        self.assertIn("FIELD_NO_DELETE", report.read_text())
+        (self.current / speech_path).unlink()
+        check(BUF, self.current, repository, "HEAD", report)
+        self.assertIn("FILE_NO_DELETE", report.read_text())
 
 
 if __name__ == "__main__":

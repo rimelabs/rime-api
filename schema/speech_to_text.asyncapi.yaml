@@ -1,0 +1,449 @@
+# AsyncAPI description of the engine's WebSocket recognition interface.
+#
+# This document describes the JSON (text-frame) encoding of the envelope
+# messages defined in `rime/speech_to_text.proto` (`SpeechWebSocketRequest` /
+# `SpeechWebSocketResponse`); the proto file is the source of truth. Payload
+# field names follow the canonical proto3 JSON mapping (camelCase, `bytes` as
+# base64, enums as their symbolic names, `uint64` as decimal strings).
+# Offering the `rime.v1.binary` WebSocket subprotocol at upgrade switches
+# server frames to the protobuf binary encoding of the same envelopes.
+asyncapi: 3.0.0
+
+info:
+  title: Rime Streaming Recognition WebSocket API
+  version: '1.0.0'
+  description: |
+    One WebSocket connection carries exactly one realtime utterance. In the
+    normal flow the client sends `start` first, then `audio` chunks of
+    headerless signed PCM16 little-endian mono 16 kHz, then `end` (or
+    `cancel` to abort); the server acknowledges an accepted `start` with
+    `started` and then emits transcript events and exactly one terminal
+    event: `done` on successful completion, `cancelled`, or `error`. A
+    request rejected before admission (for example audio before `start`) or
+    cancelled before acceptance receives its terminal `error` or `cancelled`
+    without a `started`. There are no context identifiers and no concurrent
+    utterances on a connection; open a new connection for the next utterance.
+
+    ### Output contracts
+
+    `start.outputContract` selects how partial transcripts arrive:
+
+    - `STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS`: the
+      server emits append-only `delta` fragments. Concatenate them in
+      arrival order, including newline separators between transcription
+      windows; a successful `done.text` equals that concatenation.
+    - `STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES`: the server emits full
+      replacing `hypothesis` transcripts with monotonically increasing
+      revisions. Each hypothesis replaces the previous text entirely; a
+      successful `done.text` equals the last hypothesis and carries its
+      revision, except that an utterance with no recognized speech may emit
+      no hypothesis at all and finish with an empty `done.text` and revision
+      0 (omitted in canonical JSON). `start.language`, `start.mode` and
+      `start.contextTerms` are recognition controls accepted only under this
+      contract.
+
+    The output contract is required. Unset, unspecified and unrecognized
+    values are rejected with `invalid_input`. Every accepted selection is
+    confirmed on `started.accepted` before any audio-derived response.
+
+    ### Framing and bounds
+
+    Every WebSocket message carries exactly one envelope message:
+
+    - text frames: canonical proto3 JSON encoding of the envelope
+    - binary frames: protobuf binary encoding of the envelope
+
+    Client frames are decoded according to their frame type. The response
+    encoding is fixed at upgrade time by the WebSocket subprotocol, exactly
+    as in the synthesis interface: the first recognized entry in the client's
+    offer list wins — `rime.v1.binary` selects binary frames, `rime.v1.json`
+    selects JSON text frames — and the server echoes the selected
+    subprotocol. Offering no subprotocol selects JSON.
+
+    Encoded client (input) messages are bounded to 96 KiB. Each decoded
+    `audio` payload is bounded to 64 KiB, and the decoded utterance total to
+    16 MiB; an odd decoded byte count is invalid. Oversized input produces a
+    `resource_exhausted` error when the connection remains writable.
+
+    ### Termination
+
+    When the transport remains writable, the server makes a bounded best
+    effort to emit one terminal event (`done`, `cancelled`, or `error`) and
+    then a Close frame. A peer that stops reading, transport loss, or forced
+    shutdown can instead end the connection with only a Close frame or
+    transport EOF; clients must treat any connection that ends before a
+    terminal event as an incomplete utterance, never as an empty success.
+
+servers:
+  engine:
+    host: '{host}'
+    pathname: /ws
+    protocol: ws
+    description: >-
+      Served at `GET /ws` on the recognition engine's HTTP port.
+    variables:
+      host:
+        description: Engine HTTP host and port.
+        default: '127.0.0.1:7464'
+
+channels:
+  recognition:
+    address: /ws
+    description: >-
+      The single bidirectional channel for one utterance. Client envelopes
+      select their action via the request oneof; server envelopes report
+      events via the response oneof.
+    bindings:
+      ws:
+        method: GET
+        headers:
+          type: object
+          properties:
+            Sec-WebSocket-Protocol:
+              type: string
+              description: >-
+                Optional response-encoding selector; the first recognized
+                entry in the offer list wins: `rime.v1.binary` for protobuf
+                binary frames, `rime.v1.json` for JSON text frames (also the
+                default with no subprotocol). The server echoes the selected
+                value.
+    messages:
+      start:
+        $ref: '#/components/messages/start'
+      audio:
+        $ref: '#/components/messages/audio'
+      end:
+        $ref: '#/components/messages/end'
+      cancel:
+        $ref: '#/components/messages/cancel'
+      started:
+        $ref: '#/components/messages/started'
+      delta:
+        $ref: '#/components/messages/delta'
+      hypothesis:
+        $ref: '#/components/messages/hypothesis'
+      done:
+        $ref: '#/components/messages/done'
+      error:
+        $ref: '#/components/messages/error'
+      cancelled:
+        $ref: '#/components/messages/cancelled'
+
+operations:
+  # Operation actions are from the perspective of the described application
+  # (the engine): it receives request envelopes and sends response envelopes.
+  receiveRequest:
+    action: receive
+    channel:
+      $ref: '#/channels/recognition'
+    summary: Client -> server envelope (proto `SpeechWebSocketRequest`).
+    messages:
+      - $ref: '#/channels/recognition/messages/start'
+      - $ref: '#/channels/recognition/messages/audio'
+      - $ref: '#/channels/recognition/messages/end'
+      - $ref: '#/channels/recognition/messages/cancel'
+  sendResponse:
+    action: send
+    channel:
+      $ref: '#/channels/recognition'
+    summary: Server -> client envelope (proto `SpeechWebSocketResponse`).
+    messages:
+      - $ref: '#/channels/recognition/messages/started'
+      - $ref: '#/channels/recognition/messages/delta'
+      - $ref: '#/channels/recognition/messages/hypothesis'
+      - $ref: '#/channels/recognition/messages/done'
+      - $ref: '#/channels/recognition/messages/error'
+      - $ref: '#/channels/recognition/messages/cancelled'
+
+components:
+  messages:
+    start:
+      name: start
+      title: Open the utterance
+      summary: >-
+        Required exactly once, before any audio. Audio sent before `start` is
+        rejected with kind "invalid_input". The streaming input format is
+        always headerless PCM16 little-endian mono 16 kHz and is not
+        configurable. The start payload must select `outputContract`.
+      payload:
+        type: object
+        required: [start]
+        properties:
+          start:
+            $ref: '#/components/schemas/streamingConfig'
+
+    audio:
+      name: audio
+      title: Audio chunk
+      summary: >-
+        A chunk of headerless PCM16 little-endian mono 16 kHz audio. Each
+        decoded chunk is bounded to 64 KiB and the utterance total to 16 MiB;
+        an odd decoded byte count is invalid.
+      payload:
+        type: object
+        required: [audio]
+        properties:
+          audio:
+            type: string
+            format: byte
+            description: >-
+              Base64 in JSON frames (proto3 JSON mapping of `bytes`). In
+              binary frames the audio is the `bytes` field inside the
+              protobuf-encoded request envelope, never a bare PCM WebSocket
+              frame.
+
+    end:
+      name: end
+      title: End of input
+      summary: >-
+        Commits the utterance. On successful completion the remaining
+        transcript events are delivered, followed by exactly one `done` and
+        a Close frame; a failure after `end` still terminates with `error`
+        (or `cancelled`), and transport loss can end the connection without
+        any terminal event (see Termination).
+      payload:
+        type: object
+        required: [end]
+        properties:
+          end:
+            type: object
+
+    cancel:
+      name: cancel
+      title: Cancel the utterance
+      summary: >-
+        Aborts the utterance and its backend work. Acknowledged with
+        `cancelled` and then a Close frame; queued `delta` fragments already
+        produced may still arrive before the acknowledgement. Closing the
+        connection instead also cancels the work, but cannot carry the
+        acknowledgement.
+      payload:
+        type: object
+        required: [cancel]
+        properties:
+          cancel:
+            type: object
+
+    started:
+      name: started
+      title: Utterance accepted
+      summary: >-
+        Acknowledges a successfully accepted `start`, before any
+        audio-derived response. A request rejected before admission or
+        cancelled before acceptance receives its terminal `error` or
+        `cancelled` without a `started`. `accepted` confirms the required
+        output-contract selection and any selected language.
+      payload:
+        type: object
+        required: [started]
+        properties:
+          started:
+            type: object
+            required: [accepted]
+            properties:
+              requestId:
+                type: string
+                description: >-
+                  Engine request id for this utterance; correlates with
+                  engine logs.
+              accepted:
+                type: object
+                description: >-
+                  Present for every accepted configuration, confirming its
+                  explicitly selected output contract.
+                required: [outputContract]
+                properties:
+                  outputContract:
+                    $ref: '#/components/schemas/streamingOutputContract'
+                  language:
+                    allOf:
+                      - $ref: '#/components/schemas/resolvedLanguage'
+                    description: >-
+                      Present when the caller selected a language; a detected
+                      language is reported on `done` once known.
+
+    delta:
+      name: delta
+      title: Append-only transcript fragment
+      summary: >-
+        Append-fragment contract only. Concatenate fragments in arrival
+        order, including newline separators between transcription windows;
+        they are not replacement hypotheses.
+      payload:
+        type: object
+        required: [delta]
+        properties:
+          delta:
+            type: object
+            properties:
+              text:
+                type: string
+
+    hypothesis:
+      name: hypothesis
+      title: Full replacing transcript hypothesis
+      summary: >-
+        Revised-hypotheses contract only. `text` is the complete current
+        transcript, not a delta; each hypothesis entirely replaces the
+        previous one.
+      payload:
+        type: object
+        required: [hypothesis]
+        properties:
+          hypothesis:
+            type: object
+            properties:
+              text:
+                type: string
+              revision:
+                type: string
+                description: >-
+                  uint64, a decimal string in proto3 JSON. Monotonically
+                  increasing within the utterance, starting at 1.
+
+    done:
+      name: done
+      title: Final transcript
+      summary: >-
+        Terminal: exactly one per successfully completed utterance, followed
+        by a Close frame. Under the append-fragment contract `text` equals
+        the concatenation of all preceding fragments. Under revised
+        hypotheses it equals the last hypothesis and `revision` carries that
+        hypothesis's revision — unless no recognized speech produced any
+        hypothesis, in which case `text` is empty and `revision` is 0
+        (omitted in canonical JSON).
+      payload:
+        type: object
+        required: [done]
+        properties:
+          done:
+            type: object
+            properties:
+              text:
+                type: string
+              language:
+                allOf:
+                  - $ref: '#/components/schemas/resolvedLanguage'
+                description: >-
+                  Reported under the revised-hypotheses contract; absent
+                  under the append-fragment contract.
+              revision:
+                type: string
+                description: >-
+                  uint64, a decimal string in proto3 JSON. The final
+                  hypothesis revision under revised hypotheses; zero (and
+                  omitted, as a proto3 JSON default) under the
+                  append-fragment contract.
+
+    error:
+      name: error
+      title: Error
+      summary: >-
+        Terminal: the utterance failed; followed by a Close frame when the
+        transport remains writable.
+      payload:
+        type: object
+        required: [error]
+        properties:
+          error:
+            type: object
+            properties:
+              kind:
+                type: string
+                description: >-
+                  Stable public category; clients branch on this, never on
+                  the message text (e.g. "invalid_input",
+                  "resource_exhausted", "unavailable", "timeout",
+                  "cancelled", "internal").
+              message:
+                type: string
+                description: Human-readable diagnostic.
+              requestId:
+                type: string
+
+    cancelled:
+      name: cancelled
+      title: Cancellation acknowledged
+      summary: >-
+        Terminal: acknowledges an explicit `cancel`, followed by a Close
+        frame.
+      payload:
+        type: object
+        required: [cancelled]
+        properties:
+          cancelled:
+            type: object
+
+  schemas:
+    streamingConfig:
+      type: object
+      description: >-
+        Proto3 JSON encoding of `rime.StreamingConfig`. An empty
+        configuration is invalid: outputContract must be explicitly selected.
+        `outputContract` applies to both contracts (explicit append fragments
+        is a valid selection); the recognition controls `language`, `mode`
+        and `contextTerms` require the revised-hypotheses contract, though an
+        unspecified `mode` and empty `contextTerms` are tolerated under append.
+      required: [outputContract]
+      properties:
+        language:
+          type: string
+          description: >-
+            Optional BCP-47 tag, passed to the service unchanged; omitted or
+            "und" requests detection; selected languages require revised
+            hypotheses. Append also accepts "und" as equivalent to omission.
+        mode:
+          $ref: '#/components/schemas/transcriptionMode'
+        outputContract:
+          $ref: '#/components/schemas/streamingOutputContract'
+        contextTerms:
+          type: array
+          items:
+            type: string
+          examples:
+            - [Mitchell Gourley, Super-G, USOC]
+          description: >-
+            Recognition terms that softly bias recognition without forcing
+            matches. An omitted or empty list adds no bias. The service rejects
+            empty or whitespace-only terms and preserves term order and text,
+            joining them with ", " before composition into the packaged mode
+            prompt. The model's UTF-8 caller-context byte budget includes the
+            separators. Per-word weights are not supported. Nonempty lists
+            require revised-hypotheses sessions; a scalar string is invalid.
+
+    streamingOutputContract:
+      type: string
+      enum:
+        - STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS
+        - STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES
+      description: >-
+        Symbolic enum name in proto3 JSON. A valid explicit selection is
+        confirmed on `started.accepted`. Unspecified or unrecognized values
+        are rejected rather than silently choosing another contract.
+
+    transcriptionMode:
+      type: string
+      enum:
+        - TRANSCRIPTION_MODE_UNSPECIFIED
+        - TRANSCRIPTION_MODE_WRITTEN
+        - TRANSCRIPTION_MODE_VERBATIM
+      description: >-
+        Symbolic enum name in proto3 JSON. Unspecified defaults to written
+        formatting; see the mode documentation in
+        `rime/speech_to_text.proto`.
+
+    resolvedLanguage:
+      type: object
+      description: >-
+        The canonical served catalog language and how it was chosen.
+      properties:
+        tag:
+          type: string
+          description: Canonical BCP-47 tag from the packaged model catalog.
+        source:
+          type: string
+          enum:
+            - LANGUAGE_SOURCE_UNSPECIFIED
+            - LANGUAGE_SOURCE_SELECTED
+            - LANGUAGE_SOURCE_DETECTED
+          description: Symbolic enum name in proto3 JSON.

@@ -3,16 +3,46 @@
 import base64
 import copy
 import hashlib
+import io
 import json
 from pathlib import Path
 import sys
+import tarfile
 import unittest
 from unittest.mock import patch
+import zipfile
 
 from tools import release
 
 
 PACKAGES = Path(sys.argv.pop(1))
+
+
+def rewrite_archive(name, contents, transform):
+    output = io.BytesIO()
+    if name.endswith(".whl"):
+        with (
+            zipfile.ZipFile(io.BytesIO(contents)) as source,
+            zipfile.ZipFile(output, "w") as destination,
+        ):
+            for member in source.infolist():
+                data = transform(member.filename, source.read(member))
+                if data is not None:
+                    destination.writestr(member, data)
+    else:
+        with (
+            tarfile.open(fileobj=io.BytesIO(contents)) as source,
+            tarfile.open(fileobj=output, mode="w:gz") as destination,
+        ):
+            for member in source.getmembers():
+                if not member.isfile():
+                    destination.addfile(member)
+                    continue
+                data = transform(member.name, source.extractfile(member).read())
+                if data is not None:
+                    member.size = len(data)
+                    destination.addfile(member, io.BytesIO(data))
+    return output.getvalue()
 
 
 class ReleaseTest(unittest.TestCase):
@@ -25,7 +55,7 @@ class ReleaseTest(unittest.TestCase):
         cls.version = source["version"]
         cls.schemas = {
             name: (PACKAGES / "javascript/schema" / name).read_bytes()
-            for name in [source["schema"], source["asyncapi"]["schema"]]
+            for name in source["schemas"]
         }
 
     def test_accepts_built_archives(self):
@@ -43,6 +73,71 @@ class ReleaseTest(unittest.TestCase):
             release.validate_archives(
                 dict(self.files, unexpected=b""), self.version, self.schemas
             )
+
+    def test_rejects_source_record_without_stt(self):
+        files = dict(self.files)
+        source = json.loads(files["SOURCE.json"])
+        del source["schemas"]["rime/speech_to_text.proto"]
+        files["SOURCE.json"] = json.dumps(source).encode()
+        with self.assertRaisesRegex(ValueError, "selected commit"):
+            release.validate_archives(files, self.version, self.schemas)
+
+    def test_rejects_changed_stt_in_each_archive(self):
+        for name, contents in self.files.items():
+            if name == "SOURCE.json":
+                continue
+            for schema in ("speech_to_text.proto", "speech_to_text.asyncapi.yaml"):
+                with self.subTest(archive=name, schema=schema):
+                    changed = rewrite_archive(
+                        name,
+                        contents,
+                        lambda path, data: (
+                            data + b"\n" if path.endswith("/" + schema) else data
+                        ),
+                    )
+                    with self.assertRaisesRegex(ValueError, "Archive schema differs"):
+                        release.validate_archives(
+                            dict(self.files, **{name: changed}),
+                            self.version,
+                            self.schemas,
+                        )
+
+    def test_legacy_source_record_can_recover_only_tts_commits(self):
+        schemas = {
+            name: data
+            for name, data in self.schemas.items()
+            if "speech_to_text" not in name
+        }
+        source = json.dumps(
+            {
+                "version": self.version,
+                "schema": "rime/text_to_speech.proto",
+                "sha256": hashlib.sha256(
+                    schemas["rime/text_to_speech.proto"]
+                ).hexdigest(),
+                "asyncapi": {
+                    "schema": "text_to_speech.asyncapi.yaml",
+                    "sha256": hashlib.sha256(
+                        schemas["text_to_speech.asyncapi.yaml"]
+                    ).hexdigest(),
+                },
+            }
+        ).encode()
+
+        def legacy(path, data):
+            if "speech_to_text" in path:
+                return None
+            return source if path.endswith("/SOURCE.json") else data
+
+        files = {
+            name: source
+            if name == "SOURCE.json"
+            else rewrite_archive(name, contents, legacy)
+            for name, contents in self.files.items()
+        }
+        release.validate_archives(files, self.version, schemas)
+        with self.assertRaisesRegex(ValueError, "selected commit"):
+            release.validate_archives(files, self.version, self.schemas)
 
     def test_rejects_mismatched_archive_version(self):
         files = dict(self.files)

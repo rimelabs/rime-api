@@ -22,8 +22,10 @@ import * as esm from '@rimelabs/api';
 import { fromBinary, fromJson, toBinary, toJson } from '@bufbuild/protobuf';
 const commonjs = createRequire(import.meta.url)('@rimelabs/api');
 const source = readFileSync('node_modules/@rimelabs/api/schema/rime/text_to_speech.proto', 'utf8');
+const sourceRecord = JSON.parse(readFileSync('node_modules/@rimelabs/api/SOURCE.json', 'utf8'));
 for (const definitions of [esm, commonjs]) {
   for (const fixture of JSON.parse(readFileSync('fixtures.json', 'utf8'))) {
+    if (fixture.api === 'stt' && !sourceRecord.schemas) continue;
     if (fixture.requires && !source.includes(`message ${fixture.requires} {`)) continue;
     const schema = definitions[`${fixture.message}Schema`];
     assert.equal(Buffer.from(toBinary(schema, fromJson(schema, fixture.json))).toString('hex'), fixture.hex);
@@ -43,6 +45,18 @@ const request: WebSocketRequest = create(WebSocketRequestSchema, {
 const invalid: WebSocketRequest = { ...request, payload: { case: 'text', value: 42 } };
 TS
 cp consumer.mts consumer.cts
+if node --input-type=module -e 'import { readFileSync } from "node:fs"; process.exit(JSON.parse(readFileSync("node_modules/@rimelabs/api/SOURCE.json", "utf8")).schemas ? 0 : 1)'; then
+	cat >>consumer.mts <<'TS'
+import { SpeechWebSocketRequestSchema, StreamingOutputContract } from '@rimelabs/api';
+import type { SpeechWebSocketRequest } from '@rimelabs/api';
+const speechRequest: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
+  payload: { case: 'start', value: { outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
+});
+// @ts-expect-error Audio must use bytes.
+const invalidSpeech: SpeechWebSocketRequest = { ...speechRequest, payload: { case: 'audio', value: 'audio' } };
+TS
+	cp consumer.mts consumer.cts
+fi
 ./node_modules/.bin/tsc --strict --noEmit --target es2022 --module nodenext \
 	consumer.mts consumer.cts
 echo 'Installed npm package passes ESM, CommonJS, and TypeScript checks.'

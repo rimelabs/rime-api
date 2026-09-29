@@ -1,6 +1,13 @@
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
 
 proto_library(
+    name = "speech_to_text_proto",
+    srcs = ["speech_to_text.proto"],
+    strip_import_prefix = "/schema",
+    visibility = ["//visibility:public"],
+)
+
+proto_library(
     name = "text_to_speech_proto",
     srcs = ["text_to_speech.proto"],
     strip_import_prefix = "/schema",

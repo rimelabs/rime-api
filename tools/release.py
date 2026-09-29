@@ -142,15 +142,28 @@ def validate_archives(files, version, schemas):
     source = json.loads(files["SOURCE.json"])
     expected_source = {
         "version": version,
-        "schema": "rime/text_to_speech.proto",
-        "sha256": hashlib.sha256(schemas["rime/text_to_speech.proto"]).hexdigest(),
-        "asyncapi": {
-            "schema": "text_to_speech.asyncapi.yaml",
-            "sha256": hashlib.sha256(
-                schemas["text_to_speech.asyncapi.yaml"]
-            ).hexdigest(),
+        "schemas": {
+            name: hashlib.sha256(contents).hexdigest()
+            for name, contents in schemas.items()
         },
     }
+    # Releases built before STT used a single-schema source record. Keep
+    # recovery available, but only for commits with exactly those two files.
+    if "schemas" not in source and set(schemas) == {
+        "rime/text_to_speech.proto",
+        "text_to_speech.asyncapi.yaml",
+    }:
+        expected_source = {
+            "version": version,
+            "schema": "rime/text_to_speech.proto",
+            "sha256": hashlib.sha256(schemas["rime/text_to_speech.proto"]).hexdigest(),
+            "asyncapi": {
+                "schema": "text_to_speech.asyncapi.yaml",
+                "sha256": hashlib.sha256(
+                    schemas["text_to_speech.asyncapi.yaml"]
+                ).hexdigest(),
+            },
+        }
     require(source == expected_source, "SOURCE.json does not match the selected commit")
 
     def check_contents(read, prefix):
@@ -244,9 +257,15 @@ def prepare(run_id, version, directory):
             "Duplicate artifact files",
         )
         files = {name: archive.read(name) for name in archive.namelist()}
+    schema_names = (
+        command("git", "ls-tree", "-r", "--name-only", commit, "--", "schema")
+        .decode()
+        .splitlines()
+    )
     schemas = {
-        name: command("git", "show", f"{commit}:schema/{name}")
-        for name in ("rime/text_to_speech.proto", "text_to_speech.asyncapi.yaml")
+        name.removeprefix("schema/"): command("git", "show", f"{commit}:{name}")
+        for name in schema_names
+        if re.fullmatch(r"schema/(rime/[^/]+\.proto|[^/]+\.asyncapi\.yaml)", name)
     }
     validate_archives(files, version, schemas)
     directory.mkdir(parents=True, exist_ok=False)

@@ -1,22 +1,24 @@
 # Rime API
 
 Public API definitions and generated Python and JavaScript packages for Rime
-text-to-speech.
+text-to-speech and speech-to-text.
 
 | Definition | Purpose |
 | --- | --- |
 | [Protobuf](schema/rime/text_to_speech.proto) | Synthesis, text normalization, language and speaker queries, and WebSocket messages |
 | [AsyncAPI](schema/text_to_speech.asyncapi.yaml) | WebSocket framing, authentication, and connection behavior |
+| [STT Protobuf](schema/rime/speech_to_text.proto) | Transcription requests, results, and streaming WebSocket messages |
+| [STT AsyncAPI](schema/speech_to_text.asyncapi.yaml) | Recognition WebSocket framing and connection behavior |
 
-`rimelabs/rime` owns the source definitions. Copybara copies the two public
+`rimelabs/rime` owns the source definitions. Copybara copies the four public
 files into this repository. This repository owns package generation, tests,
 versioning, and publication. See [schema sync](sync/README.md).
 
 ## Packages
 
 Python [`rime-api`](https://pypi.org/project/rime-api/) and npm
-[`@rimelabs/api`](https://www.npmjs.com/package/@rimelabs/api) are available
-as version `0.0.1`. Install them with:
+[`@rimelabs/api`](https://www.npmjs.com/package/@rimelabs/api) share the version
+in `VERSION`. Install them with:
 
 ```shell
 uv add rime-api
@@ -40,6 +42,10 @@ const request = create(WebSocketRequestSchema, {
 });
 const encoded = toBinary(WebSocketRequestSchema, request);
 ```
+
+For speech-to-text, use `from rime_api import speech_to_text_pb2` in Python
+or import `SpeechWebSocketRequestSchema` from `@rimelabs/api` in JavaScript.
+See [STT examples](packages/README.md#speech-to-text).
 
 Python requires version 3.10 or newer. JavaScript supports ESM and CommonJS,
 with TypeScript declarations. These packages supply message definitions.

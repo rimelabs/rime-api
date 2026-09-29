@@ -134,6 +134,12 @@ class CopybaraTest(unittest.TestCase):
             (origin / "interfaces/text_to_speech.asyncapi.yaml").write_text(
                 "asyncapi: 3.0.0\n"
             )
+            (origin / "interfaces/rime/speech_to_text.proto").write_text(
+                'syntax = "proto3";\nmessage TranscriptionRequest {}\n'
+            )
+            (origin / "interfaces/speech_to_text.asyncapi.yaml").write_text(
+                "asyncapi: 3.0.0\n# Recognition\n"
+            )
             (origin / "interfaces/rime/model/model.proto").write_text(
                 "INTERNAL MODEL\n"
             )
@@ -143,6 +149,10 @@ class CopybaraTest(unittest.TestCase):
             (destination / "schema").mkdir()
             (destination / "schema/BUILD.bazel").write_text(
                 "# Destination-owned build rules\n"
+            )
+            (destination / "schema/rime").mkdir()
+            (destination / "schema/rime/BUILD.bazel").write_text(
+                "# Destination-owned proto targets\n"
             )
             commit(destination, "Initialize destination")
             configuration = root / "copy.bara.sky"
@@ -186,6 +196,9 @@ class CopybaraTest(unittest.TestCase):
                 {
                     "README.md",
                     "schema/BUILD.bazel",
+                    "schema/rime/BUILD.bazel",
+                    "schema/rime/speech_to_text.proto",
+                    "schema/speech_to_text.asyncapi.yaml",
                     "schema/rime/text_to_speech.proto",
                     "schema/text_to_speech.asyncapi.yaml",
                 },
@@ -204,6 +217,18 @@ class CopybaraTest(unittest.TestCase):
                 exported("schema/rime/text_to_speech.proto"), 'syntax = "proto3";\n'
             )
             self.assertEqual(exported("README.md"), "Destination-owned documentation\n")
+            self.assertEqual(
+                exported("schema/rime/speech_to_text.proto"),
+                (origin / "interfaces/rime/speech_to_text.proto").read_text(),
+            )
+            self.assertEqual(
+                exported("schema/speech_to_text.asyncapi.yaml"),
+                (origin / "interfaces/speech_to_text.asyncapi.yaml").read_text(),
+            )
+            self.assertEqual(
+                exported("schema/rime/BUILD.bazel"),
+                "# Destination-owned proto targets\n",
+            )
             run("git", "merge", "--ff-only", "sync/public-api", directory=destination)
             migrated_revision = run(
                 "git", "rev-parse", "sync/public-api", directory=destination
@@ -218,9 +243,16 @@ class CopybaraTest(unittest.TestCase):
                 'syntax = "proto3";\nmessage Added {}\n'
             )
             (origin / "interfaces/text_to_speech.asyncapi.yaml").unlink()
+            (origin / "interfaces/rime/speech_to_text.proto").write_text(
+                'syntax = "proto3";\nmessage TranscriptionRequest { bytes audio = 1; }\n'
+            )
+            (origin / "interfaces/speech_to_text.asyncapi.yaml").unlink()
             revision = commit(origin, "ANOTHER PRIVATE MESSAGE")
             migrate()
             self.assertIn("message Added", exported("schema/rime/text_to_speech.proto"))
+            self.assertIn(
+                "bytes audio = 1", exported("schema/rime/speech_to_text.proto")
+            )
             files = run(
                 "git",
                 "ls-tree",
@@ -230,6 +262,8 @@ class CopybaraTest(unittest.TestCase):
                 directory=destination,
             ).splitlines()
             self.assertNotIn("schema/text_to_speech.asyncapi.yaml", files)
+            self.assertNotIn("schema/speech_to_text.asyncapi.yaml", files)
+            self.assertIn("schema/rime/BUILD.bazel", files)
             self.assertIn("schema/BUILD.bazel", files)
             migrate(expected=(0,))
             run("git", "revert", "--no-edit", revision, directory=origin)

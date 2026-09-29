@@ -1,0 +1,245 @@
+syntax = "proto3";
+
+package rime;
+
+// Whole-utterance and realtime speech recognition for Cassowary. Cassowary
+// adapts this public contract to the native vLLM speech APIs; vLLM owns model
+// loading, inference, and GPU scheduling.
+service SpeechToText {
+  // Transcribes one complete WAV payload. Language and formatting mode are
+  // available for the whole-utterance model path.
+  rpc Transcribe(TranscriptionRequest) returns (TranscriptionResponse) {}
+
+  // Transcribes exactly one realtime PCM16 mono 16 kHz utterance per client
+  // stream. The first request must contain `config`; following requests contain
+  // audio. Client half-close commits the utterance and produces one final `done`
+  // response. Dropping either side of the RPC cancels the associated backend
+  // work.
+  rpc TranscribeStreaming(stream StreamingTranscriptionRequest) returns (stream StreamingTranscriptionResponse) {}
+}
+
+// Output formatting intent. The packaged model prompt describes the intent;
+// it steers the model rather than hard-guaranteeing token-level behavior.
+enum TranscriptionMode {
+  // Defaults to WRITTEN on the unary and REVISED_HYPOTHESES paths. The
+  // append-fragment realtime contract permits only this value.
+  TRANSCRIPTION_MODE_UNSPECIFIED = 0;
+  // Standard written formatting: numerals as digits, codes compact.
+  // "flight two four seven" is intended to come back as "flight 247".
+  TRANSCRIPTION_MODE_WRITTEN = 1;
+  // Verbatim rendering: keep every filler, repetition, and false start;
+  // numbers as spoken words. "uh flight two four seven" is intended to come
+  // back as "uh flight two four seven".
+  TRANSCRIPTION_MODE_VERBATIM = 2;
+}
+
+message TranscriptionOptions {
+  // Optional BCP-47 language tag. Cassowary initially supports en and es.
+  optional string language = 1;
+  TranscriptionMode mode = 2;
+  // Recognition terms, for example ["Mitchell Gourley", "Super-G", "USOC"].
+  // An empty list adds no bias; the service rejects empty or whitespace-only
+  // terms. Order and term text are preserved, with ", " inserted between
+  // terms before composition into the packaged mode prompt. The packaged
+  // model's caller-context budget counts UTF-8 bytes including separators;
+  // the composed prompt keeps the mode prompt intact.
+  // Terms softly bias recognition without forcing a match; per-word weights
+  // are not supported.
+  repeated string context_terms = 3;
+}
+
+// How the resolved language was chosen.
+enum LanguageSource {
+  // The service could not resolve a catalog language for this result. Never
+  // a silent substitute for SELECTED or DETECTED.
+  LANGUAGE_SOURCE_UNSPECIFIED = 0;
+  // The caller supplied the language and the service confirmed it against
+  // the packaged model catalog.
+  LANGUAGE_SOURCE_SELECTED = 1;
+  // The caller left the language unset (or requested `und`) and the model
+  // detected the served catalog language.
+  LANGUAGE_SOURCE_DETECTED = 2;
+}
+
+message ResolvedLanguage {
+  // Canonical BCP-47 tag drawn from the packaged model catalog.
+  string tag = 1;
+  LanguageSource source = 2;
+}
+
+message TranscriptionRequest {
+  // A complete WAV file, including its RIFF/WAVE header, bounded to 16 MiB.
+  // PCM16 little-endian mono 16 kHz is the qualified input format. The
+  // packaged decoder may accept other WAV encodings/rates; those extensions
+  // are not a portable interface guarantee. Headerless PCM is not WAV.
+  bytes audio = 1;
+  optional TranscriptionOptions options = 2;
+}
+
+message TranscriptionResponse {
+  string text = 1;
+  // The canonical served language and whether the caller selected it or the
+  // model detected it. Absent when the service could not resolve a catalog
+  // language for this transcript.
+  optional ResolvedLanguage language = 2;
+}
+
+// Which streaming output contract the session uses.
+enum StreamingOutputContract {
+  // Invalid for a request: callers must explicitly select an output contract.
+  STREAMING_OUTPUT_CONTRACT_UNSPECIFIED = 0;
+  // Responses are append-only `delta` fragments: concatenate them in arrival
+  // order (including newline separators between transcription windows) to
+  // form the transcript. The final `done` text equals that concatenation.
+  STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS = 1;
+  // Responses are full replacing `hypothesis` transcripts: each hypothesis
+  // carries the complete current transcript and a monotonically increasing
+  // revision, and entirely replaces the previous one. The final `done` text
+  // equals the last hypothesis and carries its revision; an utterance with
+  // no recognized speech may emit no hypothesis and finishes with an empty
+  // final at revision zero.
+  STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES = 2;
+}
+
+// Streaming input is always headerless signed PCM16 little-endian mono
+// 16 kHz; the format is not configurable.
+message StreamingConfig {
+  reserved 1, 2;
+  reserved "sample_rate_hertz", "channels";
+
+  // Under the append-fragment contract the native realtime backend accepts
+  // only the unset language (or `und`) and unspecified mode. Under REVISED_HYPOTHESES,
+  // `language` is an optional BCP-47 tag (omitted or `und` requests
+  // detection) and `mode` selects the written or verbatim prompt.
+  optional string language = 3;
+  TranscriptionMode mode = 4;
+
+  // Explicitly selects the output contract. The service confirms the
+  // selection before accepting audio; an unrecognized value is rejected
+  // rather than silently downgraded.
+  StreamingOutputContract output_contract = 5;
+  // Recognition terms, REVISED_HYPOTHESES sessions only. Same validation,
+  // budgets and composition as TranscriptionOptions.context_terms; an empty
+  // list adds no bias and is also accepted under append fragments.
+  repeated string context_terms = 6;
+}
+
+message StreamingTranscriptionRequest {
+  oneof payload {
+    // Required exactly once as the first request.
+    StreamingConfig config = 1;
+    // PCM16 bytes. Each message is bounded to 64 KiB and the utterance to
+    // 16 MiB. An odd byte count is invalid.
+    bytes audio = 2;
+  }
+}
+
+message StreamingTranscriptionResponse {
+  oneof payload {
+    // An append-only transcript fragment under the append-fragment contract.
+    // Concatenate deltas in arrival order, including newline separators
+    // between transcription windows; they are not replacement hypotheses.
+    TranscriptionDelta delta = 1;
+    // Exactly one final transcript for a successfully completed utterance.
+    // Under the append-fragment contract its text equals the concatenation of
+    // all preceding delta fragments; under REVISED_HYPOTHESES it equals the
+    // last hypothesis. It may be empty when the input contains no recognized
+    // speech.
+    TranscriptionDone done = 2;
+    // Confirms the selected output contract before any audio-derived
+    // response. Every accepted configuration selects APPEND_FRAGMENTS or
+    // REVISED_HYPOTHESES; UNSPECIFIED is rejected as invalid input.
+    StreamingAccepted accepted = 3;
+    // The latest full transcript hypothesis under REVISED_HYPOTHESES. Each
+    // hypothesis replaces the previous one entirely.
+    TranscriptionHypothesis hypothesis = 4;
+  }
+}
+
+message StreamingAccepted {
+  StreamingOutputContract output_contract = 1;
+  // Present when the caller selected a language. A detected language is
+  // reported on `done` once it is known.
+  optional ResolvedLanguage language = 2;
+}
+
+message TranscriptionDelta {
+  string text = 1;
+}
+
+// A full-hypothesis partial. `text` is the complete current transcript, not a
+// delta; a later hypothesis with a higher revision replaces it.
+message TranscriptionHypothesis {
+  string text = 1;
+  // Monotonically increasing within a session, starting at 1.
+  uint64 revision = 2;
+}
+
+message TranscriptionDone {
+  string text = 1;
+  // See TranscriptionResponse.language. Reported under REVISED_HYPOTHESES;
+  // absent under the append-fragment contract.
+  optional ResolvedLanguage language = 2;
+  // The revision of the final hypothesis under REVISED_HYPOTHESES; zero under
+  // the append-fragment contract.
+  uint64 revision = 3;
+}
+
+// ======================= WebSocket envelope =======================
+//
+// The engine serves exactly one realtime utterance per `GET /ws` connection.
+// Text frames use canonical proto3 JSON and binary frames use protobuf encoding.
+// Encoded client (input) messages are bounded to 96 KiB, separately from the
+// decoded 64 KiB audio-chunk bound. Oversized input produces
+// resource_exhausted when the connection remains writable.
+// `rime.v1.json` and `rime.v1.binary` select response encoding exactly as in
+// the TTS interface. Offering no subprotocol selects JSON. When the transport
+// remains writable, the engine makes a bounded best effort to emit one terminal
+// response and then a Close frame. A peer that stops reading, transport loss, or
+// forced shutdown can instead end with only a Close frame or transport EOF;
+// clients must treat that as incomplete unless a terminal response was received.
+
+message SpeechWebSocketRequest {
+  oneof payload {
+    StreamingConfig start = 1;
+    bytes audio = 2;
+    SpeechWebSocketEnd end = 3;
+    SpeechWebSocketCancel cancel = 4;
+  }
+}
+
+message SpeechWebSocketEnd {}
+message SpeechWebSocketCancel {}
+
+message SpeechWebSocketResponse {
+  oneof payload {
+    SpeechWebSocketStarted started = 1;
+    TranscriptionDelta delta = 2;
+    TranscriptionDone done = 3;
+    SpeechWebSocketError error = 4;
+    SpeechWebSocketCancelled cancelled = 5;
+    // Full-hypothesis partial under REVISED_HYPOTHESES; see
+    // TranscriptionHypothesis.
+    TranscriptionHypothesis hypothesis = 6;
+  }
+}
+
+message SpeechWebSocketStarted {
+  string request_id = 1;
+  // Confirms APPEND_FRAGMENTS or REVISED_HYPOTHESES before any audio-derived
+  // response. Present for every accepted configuration.
+  optional StreamingAccepted accepted = 2;
+}
+
+message SpeechWebSocketError {
+  // Stable public category such as invalid_input, resource_exhausted,
+  // unavailable, timeout, cancelled, or internal.
+  string kind = 1;
+  // Human-readable diagnostic; clients branch on `kind`, not this text.
+  string message = 2;
+  optional string request_id = 3;
+}
+
+// Acknowledges an explicit `cancel`. Closing the connection instead also
+// cancels its associated backend work, but cannot carry this acknowledgement.
+message SpeechWebSocketCancelled {}

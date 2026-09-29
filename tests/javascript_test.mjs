@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fromBinary, fromJson, toBinary, toJson } from "@bufbuild/protobuf";
+import typescript from "typescript";
 
 const [packages, fixturePath] = process.argv.slice(2);
 const directory = resolve(packages, "javascript");
@@ -30,6 +31,8 @@ for (const definitions of [esm, commonjs]) {
     "rime.WebSocketRequest",
   );
   assert.equal(definitions.TextToSpeech.typeName, "rime.TextToSpeech");
+  assert.equal(definitions.SpeechToText.typeName, "rime.SpeechToText");
+  assert.equal(definitions.SpeechWebSocketRequestSchema.typeName, "rime.SpeechWebSocketRequest");
   const wire = Buffer.from("220568656c6c6ff80701", "hex");
   const decoded = fromBinary(definitions.WebSocketRequestSchema, wire);
   assert.equal(decoded.payload.value, "hello");
@@ -39,3 +42,40 @@ for (const definitions of [esm, commonjs]) {
   );
 }
 console.log("ESM and CommonJS pass the shared binary and JSON fixtures.");
+
+const consumer = `
+import { create } from "@bufbuild/protobuf";
+import { WebSocketRequestSchema, SpeechWebSocketRequestSchema, StreamingOutputContract } from "@rimelabs/api";
+import type { WebSocketRequest, SpeechWebSocketRequest } from "@rimelabs/api";
+const synthesis: WebSocketRequest = create(WebSocketRequestSchema, { payload: { case: "text", value: "Hello." } });
+const recognition: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
+  payload: { case: "start", value: { outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
+});
+// @ts-expect-error STT audio must be bytes.
+const invalidAudio: SpeechWebSocketRequest = { ...recognition, payload: { case: "audio", value: "audio" } };
+// @ts-expect-error TTS text must be a string.
+const invalidText: WebSocketRequest = { ...synthesis, payload: { case: "text", value: 42 } };
+`;
+for (const [format, extension] of [["esm", "mts"], ["commonjs", "cts"]]) {
+  const filename = resolve(directory, `consumer.${extension}`);
+  const options = {
+    strict: true,
+    noEmit: true,
+    target: typescript.ScriptTarget.ES2022,
+    module: typescript.ModuleKind.NodeNext,
+    paths: { "@rimelabs/api": [resolve(directory, format, "index.d.ts")] },
+  };
+  const host = typescript.createCompilerHost(options);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (path, languageVersion, ...arguments_) => path === filename
+    ? typescript.createSourceFile(path, consumer, languageVersion)
+    : getSourceFile(path, languageVersion, ...arguments_);
+  const program = typescript.createProgram([filename], options, host);
+  const diagnostics = typescript.getPreEmitDiagnostics(program);
+  assert.equal(diagnostics.length, 0, typescript.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCanonicalFileName: path => path,
+    getCurrentDirectory: () => process.cwd(),
+    getNewLine: () => "\n",
+  }));
+}
+console.log("ESM and CommonJS pass TypeScript consumer checks.");

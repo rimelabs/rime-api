@@ -1,3 +1,5 @@
 # Preserve exact copies of the authoritative schemas during formatting.
+schema/rime/speech_to_text.proto rules-lint-ignored
+schema/speech_to_text.asyncapi.yaml rules-lint-ignored
 schema/rime/text_to_speech.proto rules-lint-ignored
 schema/text_to_speech.asyncapi.yaml rules-lint-ignored
