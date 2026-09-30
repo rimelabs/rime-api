@@ -43,14 +43,20 @@ js_library(
 
 api_packages(
     name = "packages",
-    asyncapi = "//schema:text_to_speech.asyncapi.yaml",
+    asyncapis = [
+        "//schema:speech_to_text.asyncapi.yaml",
+        "//schema:text_to_speech.asyncapi.yaml",
+    ],
     license_files = [
         "LICENSE",
         "NOTICE",
         ":protobuf_license",
     ],
     plugin = ":protoc_gen_es",
-    proto = "//schema/rime:text_to_speech_proto",
+    protos = [
+        "//schema/rime:speech_to_text_proto",
+        "//schema/rime:text_to_speech_proto",
+    ],
     schema_workspace = "//schema:workspace",
     templates = [
         "//packages:README.md",

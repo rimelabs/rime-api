@@ -42,8 +42,7 @@ def archive_npm(package: Path, destination: Path) -> None:
 
 
 def build(arguments: argparse.Namespace) -> None:
-    source = arguments.source.absolute()
-    proto_root = arguments.proto_root.absolute()
+    schemas = sorted(arguments.schema)
     templates = arguments.templates.absolute()
     plugin = arguments.plugin.absolute()
     output = arguments.output.absolute()
@@ -55,20 +54,26 @@ def build(arguments: argparse.Namespace) -> None:
     javascript = output / "javascript"
     distributions = output / "dist"
     distributions.mkdir(parents=True)
-    asyncapi = arguments.asyncapi.absolute()
+    asyncapis = [path.absolute() for path in arguments.asyncapi]
     schema_directory = arguments.schema_workspace.absolute() / "schema"
     source_record = {
         "version": version,
-        "schema": "rime/text_to_speech.proto",
-        "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-        "asyncapi": {
-            "schema": "text_to_speech.asyncapi.yaml",
-            "sha256": hashlib.sha256(asyncapi.read_bytes()).hexdigest(),
+        "schemas": {
+            name: hashlib.sha256(contents).hexdigest()
+            for name, contents in sorted(
+                {
+                    **{
+                        name: (schema_directory / name).read_bytes() for name in schemas
+                    },
+                    **{path.name: path.read_bytes() for path in asyncapis},
+                }.items()
+            )
         },
     }
     for package in (python, javascript):
         shutil.copytree(schema_directory, package / "schema")
-        shutil.copyfile(asyncapi, package / "schema/text_to_speech.asyncapi.yaml")
+        for asyncapi in asyncapis:
+            shutil.copyfile(asyncapi, package / "schema" / asyncapi.name)
         shutil.copyfile(templates / "README.md", package / "README.md")
         for license_file in arguments.license_file:
             shutil.copyfile(license_file, package / license_file.name)
@@ -80,11 +85,11 @@ def build(arguments: argparse.Namespace) -> None:
     # protobuf package, field names, source file, or generated code.
     compile_proto(
         [
-            f"-Irime_api={source.parent}",
+            f"-Irime_api={schema_directory / 'rime'}",
             f"-I{schema_directory}",
             f"--python_out={python_sources}",
             f"--pyi_out={python_sources}",
-            "rime_api/text_to_speech.proto",
+            *[name.replace("rime/", "rime_api/", 1) for name in schemas],
         ]
     )
     (python_sources / "rime_api/__init__.py").write_text(
@@ -95,8 +100,7 @@ def build(arguments: argparse.Namespace) -> None:
         (templates / "python.toml").read_text().replace("@VERSION@", version)
     )
 
-    include_paths = [f"-I{schema_directory}", f"-I{proto_root}"]
-    include_paths.extend(f"-I{path.absolute()}" for path in arguments.proto_path)
+    include_paths = [f"-I{schema_directory}"]
     for directory, style in (("esm", "module"), ("commonjs", "legacy_commonjs")):
         generated = javascript / directory
         generated.mkdir()
@@ -106,7 +110,6 @@ def build(arguments: argparse.Namespace) -> None:
                 f"--plugin=protoc-gen-es={plugin}",
                 f"--es_out={generated}",
                 f"--es_opt=target=js+dts,import_extension=js,js_import_style={style}",
-                "rime/text_to_speech.proto",
                 # Google well-known types come from @bufbuild/protobuf. Other
                 # imported definitions need generated files inside this package.
                 *[
@@ -114,16 +117,20 @@ def build(arguments: argparse.Namespace) -> None:
                     for path in sorted(schema_directory.rglob("*.proto"))
                     if not path.relative_to(schema_directory)
                     .as_posix()
-                    .startswith(("google/protobuf/", "rime/"))
+                    .startswith("google/protobuf/")
                 ],
             ]
         )
-        exports = "export * from './rime/text_to_speech_pb.js';\n"
+        modules = [name.removesuffix(".proto") + "_pb.js" for name in schemas]
+        exports = "".join(f"export * from './{module}';\n" for module in modules)
         (generated / "index.d.ts").write_text(exports)
         (generated / "index.js").write_text(
             exports
             if style == "module"
-            else "module.exports = require('./rime/text_to_speech_pb.js');\n"
+            else "".join(
+                f"Object.assign(exports, require('./{module}'));\n"
+                for module in modules
+            )
         )
     (javascript / "commonjs/package.json").write_text('{"type":"commonjs"}\n')
     (javascript / "package.json").write_text(
@@ -145,14 +152,12 @@ def build(arguments: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--proto-root", type=Path, required=True)
+    parser.add_argument("--schema", action="append", required=True)
     parser.add_argument("--schema-workspace", type=Path, required=True)
-    parser.add_argument("--proto-path", type=Path, action="append", default=[])
     parser.add_argument("--plugin", type=Path, required=True)
     parser.add_argument("--templates", type=Path, required=True)
     parser.add_argument("--version", type=Path, required=True)
-    parser.add_argument("--asyncapi", type=Path, required=True)
+    parser.add_argument("--asyncapi", type=Path, action="append", required=True)
     parser.add_argument("--license-file", type=Path, action="append", default=[])
     parser.add_argument("--output", type=Path, required=True)
     build(parser.parse_args())

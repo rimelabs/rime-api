@@ -106,5 +106,91 @@
       }
     },
     "hex": "2a0c0a0a0a08080e120462757379"
+  },
+  {
+    "api": "stt",
+    "message": "TranscriptionRequest",
+    "json": {
+      "audio": "AQI=",
+      "options": {
+        "language": "en",
+        "mode": "TRANSCRIPTION_MODE_WRITTEN",
+        "contextTerms": [
+          "Rime"
+        ]
+      }
+    },
+    "hex": "0a020102120c0a02656e10011a0452696d65"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketRequest",
+    "json": {
+      "start": {
+        "language": "en",
+        "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+        "contextTerms": [
+          "Rime"
+        ]
+      }
+    },
+    "hex": "0a0c1a02656e2802320452696d65"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketRequest",
+    "json": {
+      "audio": "AQI="
+    },
+    "hex": "12020102"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketRequest",
+    "json": {
+      "end": {}
+    },
+    "hex": "1a00"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketRequest",
+    "json": {
+      "cancel": {}
+    },
+    "hex": "2200"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketResponse",
+    "json": {
+      "hypothesis": {
+        "text": "hi",
+        "revision": "9007199254740993"
+      }
+    },
+    "hex": "320d0a026869108180808080808010"
+  },
+  {
+    "api": "stt",
+    "message": "SpeechWebSocketResponse",
+    "json": {
+      "done": {
+        "text": "hi",
+        "revision": "1"
+      }
+    },
+    "hex": "1a060a0268691801"
+  },
+  {
+    "api": "stt",
+    "message": "StreamingTranscriptionRequest",
+    "json": {
+      "config": {
+        "language": "en",
+        "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS"
+      }
+    },
+    "hex": "0a061a02656e2801"
   }
 ]

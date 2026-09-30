@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 
-PUBLIC_SCHEMA = "schema/rime/text_to_speech.proto"
+PUBLIC_SCHEMA_DIRECTORY = "schema/rime"
 
 
 def compare(buf, current, baseline):
@@ -48,8 +48,9 @@ def compare(buf, current, baseline):
 
 
 def check(buf, workspace, repository, base_revision, report):
+    workspace = workspace.resolve()
     subprocess.run(
-        [str(buf), "lint", str(workspace), "--path", PUBLIC_SCHEMA],
+        [str(buf), "lint", str(workspace), "--path", PUBLIC_SCHEMA_DIRECTORY],
         cwd=workspace,
         check=True,
     )
@@ -80,12 +81,40 @@ def check(buf, workspace, repository, base_revision, report):
     for reference in dict.fromkeys(references):
         with tempfile.TemporaryDirectory() as temporary:
             baseline = Path(temporary) / "baseline"
-            shutil.copytree(workspace, baseline, copy_function=shutil.copyfile)
-            previous = subprocess.check_output(
-                ["git", "show", f"{reference}:{PUBLIC_SCHEMA}"],
-                cwd=repository,
+            # Restore the complete public schema set from the baseline. A new
+            # schema must be absent there, and a deleted schema must remain.
+            shutil.copytree(
+                workspace,
+                baseline,
+                copy_function=shutil.copyfile,
+                ignore=lambda directory, names: (
+                    ["rime"] if Path(directory) == workspace / "schema" else []
+                ),
             )
-            (baseline / PUBLIC_SCHEMA).write_bytes(previous)
+            # copytree preserves Bazel's read-only directory permissions.
+            (baseline / "schema").chmod(0o755)
+            previous_names = subprocess.check_output(
+                [
+                    "git",
+                    "ls-tree",
+                    "-r",
+                    "--name-only",
+                    reference,
+                    "--",
+                    PUBLIC_SCHEMA_DIRECTORY,
+                ],
+                cwd=repository,
+                text=True,
+            ).splitlines()
+            for name in previous_names:
+                if not name.endswith(".proto"):
+                    continue
+                previous = subprocess.check_output(
+                    ["git", "show", f"{reference}:{name}"], cwd=repository
+                )
+                destination = baseline / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(previous)
             diagnostics = compare(buf, workspace, baseline)
             sections.append(f"## Compared with {reference}\n")
             sections.extend(

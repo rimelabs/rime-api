@@ -105,6 +105,7 @@ js_test(
     data = [
         "fixtures.json",
         "//:node_modules/@bufbuild/protobuf",
+        "//:node_modules/typescript",
         "//:packages",
     ],
     entry_point = "javascript_test.mjs",

@@ -25,15 +25,32 @@ class PackageTest(unittest.TestCase):
             resources.files("rime_api").joinpath("SOURCE.json").read_text()
         )
         self.assertEqual(source["version"], distribution["Version"])
-        self.assertEqual(source["schema"], "rime/text_to_speech.proto")
-        self.assertEqual(len(source["sha256"]), 64)
         package = resources.files("rime_api")
-        schema = package.joinpath("schema/rime/text_to_speech.proto").read_bytes()
-        asyncapi = package.joinpath("schema/text_to_speech.asyncapi.yaml").read_bytes()
-        self.assertEqual(source["sha256"], hashlib.sha256(schema).hexdigest())
-        self.assertEqual(
-            source["asyncapi"]["sha256"], hashlib.sha256(asyncapi).hexdigest()
-        )
+        if packages is not None or "schemas" in source:
+            self.assertEqual(
+                set(source["schemas"]),
+                {
+                    "rime/text_to_speech.proto",
+                    "text_to_speech.asyncapi.yaml",
+                    "rime/speech_to_text.proto",
+                    "speech_to_text.asyncapi.yaml",
+                },
+            )
+            hashes = source["schemas"]
+        else:
+            # Registry recovery can install an older TTS-only release.
+            hashes = {
+                source["schema"]: source["sha256"],
+                source["asyncapi"]["schema"]: source["asyncapi"]["sha256"],
+            }
+        for name, digest in hashes.items():
+            with self.subTest(schema=name):
+                self.assertEqual(
+                    digest,
+                    hashlib.sha256(
+                        package.joinpath("schema/" + name).read_bytes()
+                    ).hexdigest(),
+                )
 
     def test_shared_fixtures(self):
         source = (
@@ -50,7 +67,10 @@ class PackageTest(unittest.TestCase):
                     and f"message {fixture['requires']} {{" not in source
                 ):
                     continue
-                message_type = getattr(proto, fixture["message"])
+                definitions = speech_proto if fixture.get("api") == "stt" else proto
+                if definitions is None:
+                    continue
+                message_type = getattr(definitions, fixture["message"])
                 message = json_format.ParseDict(fixture["json"], message_type())
                 self.assertEqual(message.SerializeToString().hex(), fixture["hex"])
                 decoded = message_type.FromString(bytes.fromhex(fixture["hex"]))
@@ -82,6 +102,29 @@ class PackageTest(unittest.TestCase):
         self.assertEqual(request.WhichOneof("payload"), "end")
         self.assertEqual(request.text, "")
 
+    def test_speech_to_text_schema(self):
+        if speech_proto is None:
+            self.skipTest("Older TTS-only release")
+        service = speech_proto.DESCRIPTOR.services_by_name["SpeechToText"]
+        self.assertEqual(service.full_name, "rime.SpeechToText")
+        self.assertEqual(
+            service.methods_by_name["Transcribe"].input_type,
+            speech_proto.TranscriptionRequest.DESCRIPTOR,
+        )
+        streaming = service.methods_by_name["TranscribeStreaming"]
+        self.assertTrue(streaming.client_streaming)
+        self.assertTrue(streaming.server_streaming)
+        request = speech_proto.SpeechWebSocketRequest(audio=b"\x01\x02")
+        self.assertEqual(request.__class__.__module__, "rime_api.speech_to_text_pb2")
+        self.assertEqual(pickle.loads(pickle.dumps(request)), request)
+        request.end.SetInParent()
+        self.assertEqual(request.WhichOneof("payload"), "end")
+        self.assertEqual(request.audio, b"")
+        config = speech_proto.StreamingConfig()
+        self.assertFalse(config.HasField("language"))
+        config.language = ""
+        self.assertTrue(config.HasField("language"))
+
     def test_unknown_binary_fields(self):
         wire = bytes.fromhex("220568656c6c6ff80701")
         message = proto.WebSocketRequest.FromString(wire)
@@ -93,10 +136,13 @@ class PackageTest(unittest.TestCase):
             directory = Path(proto.__file__).parent
             self.assertTrue((directory / "py.typed").is_file())
             self.assertTrue((directory / "text_to_speech_pb2.pyi").is_file())
+            if speech_proto is not None:
+                self.assertTrue((directory / "speech_to_text_pb2.pyi").is_file())
         else:
             with zipfile.ZipFile(next((packages / "dist").glob("*.whl"))) as wheel:
                 self.assertIn("rime_api/py.typed", wheel.namelist())
                 self.assertIn("rime_api/text_to_speech_pb2.pyi", wheel.namelist())
+                self.assertIn("rime_api/speech_to_text_pb2.pyi", wheel.namelist())
                 self.assertFalse(
                     any(name.startswith("rime/") for name in wheel.namelist())
                 )
@@ -111,6 +157,13 @@ if __name__ == "__main__":
     if packages:
         sys.path.insert(0, str(next((packages / "dist").glob("*.whl"))))
     from rime_api import text_to_speech_pb2 as proto
+
+    source_record = json.loads(
+        resources.files("rime_api").joinpath("SOURCE.json").read_text()
+    )
+    speech_proto = None
+    if packages is not None or "schemas" in source_record:
+        from rime_api import speech_to_text_pb2 as speech_proto
 
     fixtures = json.loads(arguments.fixtures.read_text())
     unittest.main(argv=[sys.argv[0]])

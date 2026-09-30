@@ -102,7 +102,9 @@ For local changes, run `bazel run //:format`, `bazel test //tests/...`, and
 
 The build uses the committed schemas. A source repository update does not
 change a release until its Copybara PR is merged here. `SOURCE.json` records
-the version and SHA-256 hashes of both definitions. The source revision is
+the version and a `schemas` map of paths to SHA-256 hashes for all four public
+definitions. Release validation also accepts the older TTS-only record format
+when recovering a release from a commit with only TTS definitions. The source revision is
 in the schema sync commit's `GitOrigin-RevId` trailer.
 
 ## Archive checks
@@ -207,7 +209,8 @@ release tag. It applies Buf's `FILE` rules to check the generated API as well
 as the wire format. The first release has no release baseline.
 
 Keep field numbers, field names, message names, and enum values compatible.
-Keep the Protobuf package `rime` and source path `rime/text_to_speech.proto`.
+Keep the Protobuf package `rime` and source paths `rime/text_to_speech.proto`
+and `rime/speech_to_text.proto`.
 The distribution names and Python import name do not change the wire protocol.
 
 Review AsyncAPI behavior changes with the engine change. Buf checks Protobuf;

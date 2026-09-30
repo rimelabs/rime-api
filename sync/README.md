@@ -7,6 +7,8 @@ Change schemas there, then use Copybara to export them here.
 | --- | --- |
 | `interfaces/rime/text_to_speech.proto` | `schema/rime/text_to_speech.proto` |
 | `interfaces/text_to_speech.asyncapi.yaml` | `schema/text_to_speech.asyncapi.yaml` |
+| `interfaces/rime/speech_to_text.proto` | `schema/rime/speech_to_text.proto` |
+| `interfaces/speech_to_text.asyncapi.yaml` | `schema/speech_to_text.asyncapi.yaml` |
 
 [copy.bara.sky](../copy.bara.sky) lists those exact files. It does not export
 the internal model protocol or other files added under `interfaces`.
@@ -35,6 +37,10 @@ Keep the file as the bootstrap record; later syncs use commit trailers.
 
 The initial snapshot does not depend on the `nastassy/rime-protos` branch or
 its PR. It does not include that PR's Arcana deprecation annotations.
+
+The STT files were added as exact copies from source revision
+`a7f0a964c107164a12e6f0647944a5d63345e09a`. The existing TTS files and the
+bootstrap revision were retained. Later Copybara exports include all four files.
 
 ## Configure the workflow
 
@@ -92,7 +98,7 @@ deprecation or license-header changes in a separate schema PR.
 ## Validation and compatibility reports
 
 `rime` is authoritative, including intentional breaking changes. Copybara exports
-only the two files listed above. Unrelated source changes produce no sync PR.
+only the four files listed above. Unrelated source changes produce no sync PR.
 Do not change a copied schema here to preserve an older client API.
 
 `tools/check_compatibility.sh` validates the schema with dependencies from the

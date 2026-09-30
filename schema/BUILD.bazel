@@ -1,10 +1,16 @@
 load("//packages:packages.bzl", "schema_workspace")
 
-exports_files(["text_to_speech.asyncapi.yaml"])
+exports_files([
+    "speech_to_text.asyncapi.yaml",
+    "text_to_speech.asyncapi.yaml",
+])
 
 schema_workspace(
     name = "workspace",
     configuration = "//:buf.yaml",
-    proto = "//schema/rime:text_to_speech_proto",
+    protos = [
+        "//schema/rime:speech_to_text_proto",
+        "//schema/rime:text_to_speech_proto",
+    ],
     visibility = ["//visibility:public"],
 )

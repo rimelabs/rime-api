@@ -13,10 +13,14 @@ core.workflow(
         integrates = [],
     ),
     origin_files = glob([
+        "interfaces/rime/speech_to_text.proto",
+        "interfaces/speech_to_text.asyncapi.yaml",
         "interfaces/rime/text_to_speech.proto",
         "interfaces/text_to_speech.asyncapi.yaml",
     ]),
     destination_files = glob([
+        "schema/rime/speech_to_text.proto",
+        "schema/speech_to_text.asyncapi.yaml",
         "schema/rime/text_to_speech.proto",
         "schema/text_to_speech.asyncapi.yaml",
     ]),

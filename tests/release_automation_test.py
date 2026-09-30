@@ -220,6 +220,8 @@ class ReleaseAutomationTest(unittest.TestCase):
         def command(*arguments):
             if arguments[:2] == ("git", "merge-base"):
                 return b""
+            if arguments[:2] == ("git", "ls-tree"):
+                return b"schema/rime/text_to_speech.proto\nschema/text_to_speech.asyncapi.yaml\nschema/rime/speech_to_text.proto\nschema/speech_to_text.asyncapi.yaml\nschema/BUILD.bazel\n"
             if arguments[:2] == ("git", "show"):
                 return (
                     self.version.encode()
@@ -240,9 +242,18 @@ class ReleaseAutomationTest(unittest.TestCase):
             patch.object(release, "github", side_effect=github),
             patch.object(release, "github_pages", side_effect=github_pages),
             patch.object(release, "command", side_effect=command),
-            patch.object(release, "validate_archives"),
+            patch.object(release, "validate_archives") as validate_archives,
         ):
             release.prepare(123, self.version, destination)
+        self.assertEqual(
+            set(validate_archives.call_args.args[2]),
+            {
+                "rime/text_to_speech.proto",
+                "text_to_speech.asyncapi.yaml",
+                "rime/speech_to_text.proto",
+                "speech_to_text.asyncapi.yaml",
+            },
+        )
         return json.loads((destination / "RELEASE.json").read_text())
 
     def test_partial_publication_reserves_the_original_check_run(self):
