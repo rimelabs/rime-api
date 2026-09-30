@@ -60,6 +60,22 @@ message SynthesisRequest {
   // Timestamps of the spoken spans of the synthesized audio, delivered in
   // the trailer once the audio has drained. Off unless requested.
   optional TimestampOptions timestamps = 10;
+
+  // Per-request pronunciation overrides. Validated against the request
+  // language's phonology (an ill-formed entry fails the request) and applied by
+  // the segmenter and the pronunciation stages. See
+  // engine/src/pipeline/pronunciation.rs.
+  repeated PronunciationEntry custom_lexicon = 11;
+}
+
+// One custom-lexicon pronunciation override. The neural backend speaks
+// `spelling` (matched case-insensitively as a whole word) using `pronunciation`
+// wherever it occurs in the request text.
+message PronunciationEntry {
+  // The word to override, e.g. "cache".
+  string spelling = 1;
+  // Its X-SAMPA pronunciation, e.g. `" k { S` (primary stress, then phones).
+  string pronunciation = 2;
 }
 
 message SynthesisResponseStream {
@@ -164,6 +180,10 @@ message NormalizeTextRequest {
 
   // BCP-47 language tag, e.g. "en".
   optional string language = 2;
+
+  // Per-request pronunciation overrides; same shape and validation as on
+  // SynthesisRequest.
+  repeated PronunciationEntry custom_lexicon = 3;
 }
 
 message NormalizeTextResponse {
