@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/rimelabs/rime-api/compare/v0.2.0...v0.3.0) (2026-10-08)
+
+
+### Features
+
+* **api:** sync public API definitions ([#14](https://github.com/rimelabs/rime-api/issues/14)) ([2afa4db](https://github.com/rimelabs/rime-api/commit/2afa4db2419302fac3396cd101ba92e7adefa522))
+* **go:** publish generated protocol module with API releases ([#16](https://github.com/rimelabs/rime-api/issues/16)) ([9275e41](https://github.com/rimelabs/rime-api/commit/9275e41bc26eae8a3cef092e706acdfde2ea1502))
+
 ## [0.2.0](https://github.com/rimelabs/rime-api/compare/v0.1.0...v0.2.0) (2026-09-30)
 
 
