@@ -37,6 +37,8 @@ jobs:
         with:
           name: api-compatibility
           path: ${{ runner.temp }}/api-compatibility.md
+      - name: Verify generated Go protocol
+        run: bazel run //:update_go -- --check
       - name: Build and test
         run: |
           bazel test //tests/...
@@ -100,3 +102,23 @@ jobs:
           path: dist/
       - name: Test installed npm package
         run: bash tests/test_installed_javascript.sh dist/*.tgz
+  go:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.24.x', stable]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: go/go.sum
+      - name: Test the public Go module
+        working-directory: go
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+          go vet ./...
+          go test -race ./... -args -fixtures ../tests/fixtures.json
+          CGO_ENABLED=0 go build ./...

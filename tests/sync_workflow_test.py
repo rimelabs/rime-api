@@ -53,7 +53,17 @@ class SyncWorkflowTest(unittest.TestCase):
             esac
             """,
         )
-        self.install_command("bazel", 'exit "${COPYBARA_STATUS:-0}"\n')
+        self.install_command(
+            "bazel",
+            """
+            if [[ "$*" == 'run //:update_go' ]]; then
+              mkdir -p go
+              echo generated > go/definition.pb.go
+              exit 0
+            fi
+            exit "${COPYBARA_STATUS:-0}"
+            """,
+        )
         self.install_command(
             "git",
             """
@@ -147,6 +157,10 @@ class SyncWorkflowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertEqual(self.pull_requests.read_text(), "17\n")
         self.assertTrue(self.branch_exists())
+        self.assertEqual(
+            self.git("show", "origin/sync/public-api:go/definition.pb.go").strip(),
+            "generated",
+        )
         self.assertEqual(
             self.git("show", "origin/sync/public-api:sync/SOURCE_REVISION").strip(),
             "b" * 40,

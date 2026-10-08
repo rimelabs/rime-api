@@ -211,6 +211,28 @@ def validate_archives(files, version, schemas):
         check_contents(read, f"rime_api-{version}/")
 
 
+def go_module_present(commit):
+    return (
+        command("git", "ls-tree", "--name-only", commit, "--", "go/go.mod").strip()
+        == b"go/go.mod"
+    )
+
+
+def validate_jobs(jobs, require_go):
+    require(
+        jobs
+        and all(job["conclusion"] == "success" for job in jobs)
+        and any(job["name"] == "build" for job in jobs)
+        and any(job["name"].startswith("python (") for job in jobs)
+        and any(job["name"].startswith("javascript (") for job in jobs)
+        and (
+            not require_go
+            or {"go (1.24.x)", "go (stable)"}.issubset({job["name"] for job in jobs})
+        ),
+        "Every build and installation job must pass, including Go when present",
+    )
+
+
 def prepare(run_id, version, directory):
     archive_names(version)
     run = github(f"actions/runs/{run_id}")
@@ -224,14 +246,7 @@ def prepare(run_id, version, directory):
     jobs = github_pages(
         f"actions/runs/{run_id}/attempts/{run['run_attempt']}/jobs?per_page=100", "jobs"
     )
-    require(
-        jobs
-        and all(job["conclusion"] == "success" for job in jobs)
-        and any(job["name"] == "build" for job in jobs)
-        and any(job["name"].startswith("python (") for job in jobs)
-        and any(job["name"].startswith("javascript (") for job in jobs),
-        "Every build and installation job must pass",
-    )
+    validate_jobs(jobs, go_module_present(commit))
     artifacts = github_pages(
         f"actions/runs/{run_id}/artifacts?per_page=100", "artifacts"
     )
@@ -282,6 +297,8 @@ def prepare(run_id, version, directory):
             for name, contents in files.items()
         },
     }
+    if go_module_present(commit):
+        record["go_tree"] = command("git", "rev-parse", f"{commit}:go").decode().strip()
     check_release_record(record)
     (directory / "RELEASE.json").write_text(json.dumps(record, indent=2) + "\n")
     print(f"Verified {version} from {commit}, test run {run_id}")
@@ -494,32 +511,22 @@ def published_release(directory):
     return ready
 
 
-def finalize_release(directory):
-    """Create the release at the tested commit; retries must preserve its files."""
-    require(published_release(directory), "Both registries must contain tested files")
-    record = json.loads((directory / "RELEASE.json").read_text())
-    version, commit = record["version"], record["commit"]
-    require(re.fullmatch(r"[0-9a-f]{40}", commit), "Invalid source commit")
-    command("git", "merge-base", "--is-ancestor", commit, "HEAD")
-    require(commit_file(commit, "VERSION") == version, "Commit version differs")
-    tag = f"v{version}"
-    references = (
-        command(
+def release_tag_target(tag):
+    references = dict(
+        line.split()[::-1]
+        for line in command(
             "git", "ls-remote", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"
         )
         .decode()
         .splitlines()
     )
-    references = dict(line.split()[::-1] for line in references)
-    target = references.get(f"refs/tags/{tag}^{{}}", references.get(f"refs/tags/{tag}"))
+    return references.get(f"refs/tags/{tag}^{{}}", references.get(f"refs/tags/{tag}"))
+
+
+def ensure_release_tag(tag, commit):
+    target = release_tag_target(tag)
     require(target is None or target == commit, "Existing tag points to another commit")
-    releases = github_pages("releases?per_page=100")
-    existing = next((item for item in releases if item["tag_name"] == tag), None)
-    if existing and not target:
-        require(
-            existing["target_commitish"] == commit, "Existing release commit differs"
-        )
-    if not target:
+    if target is None:
         command(
             "gh",
             "api",
@@ -531,6 +538,34 @@ def finalize_release(directory):
             "-f",
             f"sha={commit}",
         )
+
+
+def finalize_release(directory):
+    """Create the release at the tested commit; retries must preserve its files."""
+    require(published_release(directory), "Both registries must contain tested files")
+    record = json.loads((directory / "RELEASE.json").read_text())
+    version, commit = record["version"], record["commit"]
+    require(re.fullmatch(r"[0-9a-f]{40}", commit), "Invalid source commit")
+    command("git", "merge-base", "--is-ancestor", commit, "HEAD")
+    require(commit_file(commit, "VERSION") == version, "Commit version differs")
+    tag = f"v{version}"
+    if go_module_present(commit):
+        require(
+            record.get("go_tree")
+            == command("git", "rev-parse", f"{commit}:go").decode().strip(),
+            "Go release tree differs from the tested record",
+        )
+        ensure_release_tag(f"go/v{version}", commit)
+        command("bash", "tools/check_go_release.sh", version, commit)
+    target = release_tag_target(tag)
+    require(target is None or target == commit, "Existing tag points to another commit")
+    releases = github_pages("releases?per_page=100")
+    existing = next((item for item in releases if item["tag_name"] == tag), None)
+    if existing and not target:
+        require(
+            existing["target_commitish"] == commit, "Existing release commit differs"
+        )
+    ensure_release_tag(tag, commit)
     if not existing:
         changelog = subprocess.run(
             ["git", "show", f"{commit}:CHANGELOG.md"],

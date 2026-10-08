@@ -197,6 +197,21 @@ jobs:
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
           done
+      - name: Select the tested Go toolchain
+        id: go_toolchain
+        if: steps.published.outputs.ready == 'true'
+        run: |
+          release_commit=$(jq -er '.commit | select(type == "string") | select(test("^[0-9a-f]{40}$"))' release-dist/RELEASE.json)
+          git cat-file -e "$release_commit^{commit}"
+          if git cat-file -e "$release_commit:go/go.mod" 2>/dev/null; then
+            git show "$release_commit:go/go.mod" > "$RUNNER_TEMP/release-go.mod"
+            echo "version_file=$RUNNER_TEMP/release-go.mod" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-go@v6
+        if: steps.published.outputs.ready == 'true' && steps.go_toolchain.outputs.version_file != ''
+        with:
+          go-version-file: ${{ steps.go_toolchain.outputs.version_file }}
+          cache: false
       - name: Create the verified tag and GitHub release
         if: steps.published.outputs.ready == 'true'
         env:

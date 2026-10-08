@@ -1,5 +1,15 @@
 module(name = "rime_api")
 
+bazel_dep(name = "rules_go", version = "0.63.0")
+bazel_dep(name = "gazelle", version = "0.54.0")
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.13")
+
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//tools:go.mod")
+use_repo(go_deps, "org_golang_google_grpc_cmd_protoc_gen_go_grpc", "org_golang_google_protobuf")
+
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "aspect_rules_js", version = "3.4.0")
 
