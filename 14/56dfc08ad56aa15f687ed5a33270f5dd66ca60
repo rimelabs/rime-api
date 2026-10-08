@@ -1,0 +1,21 @@
+.github/workflows/release.yaml
+  s_264b98dc6486d6::t_3dd9df995050bf 207-210
+tests/release_publication_workflow_test.mjs
+  s_264b98dc6486d6::t_d21a5b11b514c5 5,129-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1456dfc08ad56aa15f687ed5a33270f5dd66ca60",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
