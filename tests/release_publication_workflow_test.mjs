@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 
 const workflow = readFileSync(process.argv[2], "utf8");
@@ -126,8 +126,11 @@ test("finalization selects the tested Go version and supports releases before Go
 
     const selected = select(testedCommit);
     assert.equal(selected.status, 0, selected.stderr);
-    assert.equal(readFileSync(join(directory, "release-go.mod"), "utf8"), testedModule);
-    assert.equal(readFileSync(environment.GITHUB_OUTPUT, "utf8"), `version_file=${directory}/release-go.mod\n`);
+    const versionFile = readFileSync(environment.GITHUB_OUTPUT, "utf8").trim().split("=")[1];
+    // actions/setup-go parses module syntax only for this exact basename.
+    assert.equal(basename(versionFile), "go.mod");
+    assert.equal(readFileSync(join(directory, "release-go/go.mod"), "utf8"), testedModule);
+    assert.equal(readFileSync(environment.GITHUB_OUTPUT, "utf8"), `version_file=${directory}/release-go/go.mod\n`);
 
     const legacy = select(beforeGo);
     assert.equal(legacy.status, 0, legacy.stderr);
