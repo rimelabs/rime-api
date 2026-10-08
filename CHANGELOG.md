@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/rimelabs/rime-api/compare/v0.1.0...v0.2.0) (2026-09-30)
+
+
+### Features
+
+* **api:** add STT schemas to public packages ([#12](https://github.com/rimelabs/rime-api/issues/12)) ([ac3dea5](https://github.com/rimelabs/rime-api/commit/ac3dea5644d5b14c6ceefc9bb2d4b6fa2fd26c5f))
+
+
+### Bug Fixes
+
+* **release:** handle delayed registry and draft availability ([74c0782](https://github.com/rimelabs/rime-api/commit/74c078241cd6f153d4dd8abdc3d6af88ec9b386b))
+
 ## [0.1.0](https://github.com/rimelabs/rime-api/compare/v0.0.2...v0.1.0) (2026-09-29)
 
 
