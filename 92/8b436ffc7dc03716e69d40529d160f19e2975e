@@ -1,0 +1,27 @@
+tools/release.py
+  s_264b98dc6486d6::t_bd01fac5c834a7 228-229,231
+  s_264b98dc6486d6::t_8011cdc37a5c75 230
+tests/release_publication_workflow_test.mjs
+  s_264b98dc6486d6::t_677cb13c6a3c7b 2-5,80-139
+  s_264b98dc6486d6::t_2c9b59e0be1753 140
+tests/release_automation_test.py
+  s_264b98dc6486d6::t_bd01fac5c834a7 431-438,440-451
+.github/workflows/release.yaml
+  s_264b98dc6486d6::t_677cb13c6a3c7b 200-201,203-211,213-214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "928b436ffc7dc03716e69d40529d160f19e2975e",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
