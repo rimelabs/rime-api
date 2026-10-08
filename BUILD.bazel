@@ -76,3 +76,9 @@ alias(
     name = "format_check",
     actual = "//tools:format.check",
 )
+
+js_library(
+    name = "schema_source_workflow",
+    srcs = [".github/workflows/schema-source.yaml"],
+    visibility = ["//tests:__pkg__"],
+)

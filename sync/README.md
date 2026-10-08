@@ -16,31 +16,51 @@ Build rules, package metadata, tests, and release tooling belong to this
 repository and are outside Copybara's destination file list.
 
 Copybara creates a commit on `sync/public-api`. The workflow opens a PR against
-`main`. The commit records `GitOrigin-RevId` and uses a fixed public message
-and author. It does not copy private commit descriptions or author addresses.
-Merge the sync PR with its revision trailer intact. A merge commit or a
-fast-forward preserves it. If you squash, retain the trailer in the result.
-The fixed public commit message and PR title are
-`feat(api): sync public API definitions`. This selects a feature release in
-Release Please without copying private source commit descriptions. Review
-the proposed version and public changelog in the separate release PR. Use
-`fix:` for corrections and `feat!:` for breaking changes when preparing a
-squash commit, and retain `GitOrigin-RevId`. Schema validation and package tests must pass. Compatibility changes are
-reported for release review and do not stop sync.
+`main`. The commit uses a fixed public message and author. It does not copy
+private commit descriptions or author addresses.
 
-## Initial source revision
+## Source revision and merge checks
 
-[INITIAL_REVISION](INITIAL_REVISION) identifies the `rime/main` commit used
-for the initial schema files. They are exact copies of that commit. This
-baseline lets the first sync proceed before there is a Copybara commit here.
-Keep the file as the bootstrap record; later syncs use commit trailers.
+`sync/SOURCE_REVISION` records the exact `rime` commit represented by all exported
+schemas. The sync job passes this revision to Copybara, keeps its last-revision
+consistency check enabled, and updates the file from the exported commit's
+`GitOrigin-RevId` trailer. The revision file survives squash merges.
+`sync/INITIAL_REVISION` is the historical bootstrap record; it no longer selects
+the current baseline.
 
-The initial snapshot does not depend on the `nastassy/rime-protos` branch or
-its PR. It does not include that PR's Arcana deprecation annotations.
+The baseline is `a7f0a964c107164a12e6f0647944a5d63345e09a`. All four schemas were
+verified byte for byte against that source revision. The earlier TTS-only revision
+could not describe the STT files added in PR #12.
 
-The STT files were added as exact copies from source revision
-`a7f0a964c107164a12e6f0647944a5d63345e09a`. The existing TTS files and the
-bootstrap revision were retained. Later Copybara exports include all four files.
+The **Verify schema source** workflow checks each proposed schema against its
+recorded source revision. It also checks that the revision belongs to `rime/main`.
+It posts the **Schema source** commit status. Require this status before merging
+into `main`.
+
+This workflow runs trusted code from `main`. It reads candidate files as data
+through the GitHub API. It never checks out or executes candidate code with the
+private-source credential, and it does not upload private source files or print
+schema differences. Normal package checks do not receive that credential. Fork PRs require a
+maintainer to dispatch this source check before it accesses the private source.
+
+Schema edits belong in `rime`; export them through Copybara. If an existing export
+must be recovered, first compare every exported file with the proposed source
+revision. Change `sync/SOURCE_REVISION` only when every file matches. Do not disable
+Copybara's consistency check or use `--force` to hide a mismatch.
+
+To add or remove exported files, open a reviewed PR that updates both literal
+file lists in `copy.bara.sky`, the selected source revision, and the schema files.
+The normal source check rejects an export-list change. After reviewing the new
+list for public disclosure, a maintainer can run **Verify schema source** from
+`main`, supply the PR number, and select **I reviewed the changed list of public
+schema exports**. This verifies all selected files without executing the proposed
+Copybara configuration. The approval applies only to that checked commit; a new
+push runs the normal check again. Other Copybara behavior changes need a separate
+trusted policy review.
+
+Release Please starts the source check explicitly for its own PRs. To recheck
+another PR, dispatch **Verify schema source** from `main` with its PR number.
+Publication remains separate from schema sync and validation.
 
 ## Configure the workflow
 
@@ -80,9 +100,8 @@ To preview an export with credentials that can read the source repository:
 bazel run //tools:copybara -- migrate "$PWD/copy.bara.sky" public_api --dry-run
 ```
 
-Before the first sync commit exists on `main`, add
-`--last-rev="$(cat sync/INITIAL_REVISION)"`. Later runs find the source revision
-from the last merged Copybara commit. Exit code 4 means no selected files changed.
+Pass `--last-rev="$(cat sync/SOURCE_REVISION)"` to use the recorded baseline.
+Exit code 4 means no selected files changed.
 
 The integration test uses temporary local Git repositories. It checks first
 export, repeated export before and after merge, source reverts, changes,

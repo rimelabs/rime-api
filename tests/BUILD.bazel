@@ -127,3 +127,21 @@ py_test(
     ],
     legacy_create_init = 0,
 )
+
+py_test(
+    name = "schema_source_test",
+    size = "small",
+    srcs = ["schema_source_test.py"],
+    args = ["$(rootpath //:copy.bara.sky)"],
+    data = ["//:copy.bara.sky"],
+    legacy_create_init = 0,
+    deps = ["//tools:schema_source"],
+)
+
+js_test(
+    name = "schema_source_workflow_test",
+    size = "small",
+    args = ["$(rootpath //:schema_source_workflow)"],
+    data = ["//:schema_source_workflow"],
+    entry_point = "schema_source_workflow_test.mjs",
+)
