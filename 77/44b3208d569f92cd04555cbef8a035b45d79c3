@@ -1,0 +1,19 @@
+tests/go_publication_test.py
+  s_264b98dc6486d6::t_27bb7d66a00cbe 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7744b3208d569f92cd04555cbef8a035b45d79c3",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
