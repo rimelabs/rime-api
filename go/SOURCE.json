@@ -1,0 +1,11 @@
+{
+  "schemas": {
+    "google/protobuf/any.proto": "8e56f61e3078e9232d39ce1b1bab28613783af8191f93a910c3617933f87a179",
+    "google/protobuf/duration.proto": "a3f7301ff2956ec2e30c2241ece07197e4a86c752348d5607224819d4921c9fe",
+    "google/rpc/status.proto": "3b5c712455570ac4342dd3c521c4c11011652ae9a0fbca75ba22fcc45c6e1991",
+    "rime/speech_to_text.proto": "77131e17e7048cd989d547ff81c991151c23b896272b6bff903bd548eb8eb5b3",
+    "rime/text_to_speech.proto": "964fb10df76a61b2ab89d0590f3f4922b49124bd3d12979a3790f65d837fe4e3",
+    "speech_to_text.asyncapi.yaml": "604cb549319ff1bc7cc792d4a6df15dd8d9d75123397d57a3f31e8e5d93b71b6",
+    "text_to_speech.asyncapi.yaml": "00e1223faf9858c278046bf774cf9f328606cfc336b02c71fdbf52c82a85ee35"
+  }
+}

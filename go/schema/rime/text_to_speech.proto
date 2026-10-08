@@ -1,0 +1,372 @@
+syntax = "proto3";
+
+package rime;
+
+import "google/protobuf/duration.proto";
+import "google/rpc/status.proto";
+
+service TextToSpeech {
+  rpc Synthesize(SynthesisRequest) returns (stream SynthesisResponseStream) {}
+  // Streaming text input: the client feeds text incrementally into a single
+  // continuous synthesis. The FIRST client message MUST set `header` (all
+  // synthesis params; its `text` field may carry the first chunk or be empty);
+  // subsequent messages set `text_chunk`. End-of-input is signalled by the
+  // client half-closing the request stream. Audio frames stream back as they
+  // are produced.
+  rpc SynthesizeStreaming(stream StreamingSynthesisRequest) returns (stream SynthesisResponseStream) {}
+  rpc NormalizeText(NormalizeTextRequest) returns (NormalizeTextResponse) {}
+  rpc GetSupportedLanguages(GetSupportedLanguagesRequest) returns (GetSupportedLanguagesResponse) {}
+  rpc GetSupportedSpeakers(GetSupportedSpeakersRequest) returns (GetSupportedSpeakersResponse) {}
+}
+
+message StreamingSynthesisRequest {
+  reserved 3;
+  reserved "flush";
+
+  oneof payload {
+    // FIRST message only: all synthesis parameters. Its `text` field may carry
+    // the first complete sentence or be left empty.
+    SynthesisRequest header = 1;
+
+    // Subsequent messages: one complete sentence to append to the live
+    // synthesis.
+    string text_chunk = 2;
+  }
+}
+
+message SynthesisRequest {
+  reserved 1, 7;
+  reserved "arcana_parameters";
+
+  // BCP-47 language tag, e.g. "en".
+  // Used to route the frontend pipeline and set backend language.
+  optional string language = 2;
+
+  // Speaker name, e.g. "luna".
+  optional string speaker = 3;
+
+  // Text to synthesize.
+  string text = 4;
+
+  optional AudioParameters audio_parameters = 5;
+
+  // Controls how input text is split before synthesis.
+  // Defaults to SPLIT_STRATEGY_SENTENCE when unset.
+  optional SplitStrategy split_strategy = 6;
+
+  optional CodaParameters coda_parameters = 8;
+  optional MistParameters mist_parameters = 9;
+
+  // Timestamps of the spoken spans of the synthesized audio, delivered in
+  // the trailer once the audio has drained. Off unless requested.
+  optional TimestampOptions timestamps = 10;
+
+  // Per-request pronunciation overrides. Validated against the request
+  // language's phonology (an ill-formed entry fails the request) and applied by
+  // the segmenter and the pronunciation stages. See
+  // engine/src/pipeline/pronunciation.rs.
+  repeated PronunciationEntry custom_lexicon = 11;
+}
+
+// One custom-lexicon pronunciation override. The neural backend speaks
+// `spelling` (matched case-insensitively as a whole word) using `pronunciation`
+// wherever it occurs in the request text.
+message PronunciationEntry {
+  // The word to override, e.g. "cache".
+  string spelling = 1;
+  // Its X-SAMPA pronunciation, e.g. `" k { S` (primary stress, then phones).
+  string pronunciation = 2;
+}
+
+message SynthesisResponseStream {
+  oneof payload {
+    // A chunk of encoded audio, in the format requested.
+    bytes audio = 1;
+
+    // Sent once, after the last audio chunk, when the request asked for
+    // anything it carries. A request that asked for nothing sees no trailer.
+    SynthesisResponseTrailer trailer = 2;
+  }
+}
+
+// Results that settle only once the audio has drained.
+message SynthesisResponseTrailer {
+  // Present when `timestamps.enable` was set.
+  optional Timestamps timestamps = 1;
+}
+
+message AudioParameters {
+  // Equivalent to the HTTP `Accept` header.
+  // Examples: "audio/wav", "audio/mpeg", "audio/ogg;codecs=opus", "audio/l16".
+  optional string audio_format = 1;
+
+  optional int32 sampling_rate = 2;
+  optional float time_scale_factor = 3;
+}
+
+message CodaParameters {
+  reserved 1, 2, 3, 4, 5, 6, 7;
+  reserved "temperature", "top_k", "top_p", "repetition_penalty", "max_tokens", "min_tokens", "seed";
+
+  // Streaming text input (`SynthesizeStreaming` / WebSocket `text`) only:
+  // number of leading text tokens prefilled as a lookahead block so the first
+  // audio frames have content context. Higher values improve content
+  // robustness at the start of the utterance but delay the first audio until
+  // that many text tokens have arrived. Clamped to the tokens available when
+  // generation starts. Defaults to 0, which reproduces upstream Qwen3-TTS's
+  // exact streaming layout. Ignored for one-shot synthesis (which always sees
+  // the complete text up front).
+  optional int32 text_lookahead_tokens = 8;
+}
+
+message MistParameters {
+  optional bool pause_between_brackets = 1;
+  optional bool phonemize_between_brackets = 2;
+  repeated float inline_time_scale_factors = 3;
+  optional bool save_oovs = 4;
+}
+
+message TimestampOptions {
+  // Report a SpanTimestamp for every spoken span. Costs one aligner
+  // inference per request; never delays or fails the audio.
+  bool enable = 1;
+}
+
+// One span of the text the talker spoke, as the aligner segments it: a
+// whitespace-separated word of the request text after normalization (so
+// numbers and abbreviations appear spelled out), or a morpheme for a
+// language written without spaces.
+message SpanTimestamp {
+  string text = 1;
+  // Offsets from the start of the synthesized audio, at the audio's native
+  // rate and before `time_scale_factor`.
+  google.protobuf.Duration start = 2;
+  google.protobuf.Duration end = 3;
+}
+
+// The timestamps of one synthesis, delivered once after all audio: on gRPC
+// as `trailer.timestamps`, on WebSocket as `done.timestamps`. Absent when
+// the request did not ask for them. A non-OK status never fails the
+// synthesis that produced the audio.
+message Timestamps {
+  // How the alignment settled, with `code` a google.rpc.Code. `OK` carries
+  // spans; every other code carries none, with the reason in `message`:
+  //   INVALID_ARGUMENT     the aligner does not support the request's
+  //                        language, or rejected the utterance;
+  //   RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
+  //                        or the branch lost input under load;
+  //   DEADLINE_EXCEEDED    the aligner did not answer within its budget;
+  //   UNAVAILABLE          the aligner worker is not serving;
+  //   UNIMPLEMENTED        this package has no aligner;
+  //   CANCELLED            synthesis ended before alignment settled.
+  google.rpc.Status status = 1;
+  repeated SpanTimestamp spans = 2;
+}
+
+enum SplitStrategy {
+  SPLIT_STRATEGY_UNSPECIFIED = 0;
+  SPLIT_STRATEGY_SENTENCE = 1;
+  SPLIT_STRATEGY_NONE = 2;
+  // Accumulates streamed sub-sentential text tokens into complete sentences
+  // before synthesis. Only valid for streaming requests
+  // (SynthesizeStreaming or the WebSocket API); a unary Synthesize request
+  // that asks for it is rejected.
+  SPLIT_STRATEGY_ACCUMULATE_SENTENCE = 3;
+}
+
+message NormalizeTextRequest {
+  // Text to normalize.
+  string text = 1;
+
+  // BCP-47 language tag, e.g. "en".
+  optional string language = 2;
+
+  // Per-request pronunciation overrides; same shape and validation as on
+  // SynthesisRequest.
+  repeated PronunciationEntry custom_lexicon = 3;
+}
+
+message NormalizeTextResponse {
+  // Deprecated: use normalized_sentences. Sentences are concatenated with no
+  // whitespace separator, so multi-sentence inputs come back glued together.
+  string normalized_text = 1;
+
+  // The normalized text, one entry per sentence emitted by the frontend
+  // pipeline. Each entry is already trimmed; join with a single space to
+  // reconstruct display text.
+  repeated string normalized_sentences = 2;
+}
+
+message GetSupportedLanguagesRequest {
+  // Empty for now, but used instead of google.protobuf.Empty for extensibility.
+}
+
+message GetSupportedLanguagesResponse {
+  // List of supported BCP-47 language tags.
+  repeated string languages = 1;
+}
+
+message GetSupportedSpeakersRequest {
+  optional string language = 1;
+}
+
+message GetSupportedSpeakersResponse {
+  // List of supported speaker names for the given language.
+  repeated string speakers = 1;
+}
+
+// ======================= WebSocket envelope =======================
+//
+// The engine serves a WebSocket synthesis interface at `GET /ws` on the HTTP
+// port. Every WebSocket message carries exactly one envelope message:
+//   - text frames:   canonical proto3 JSON encoding of the envelope
+//   - binary frames: protobuf binary encoding of the envelope
+// Client frames are decoded according to their frame type. The response
+// encoding is fixed at upgrade time by the WebSocket subprotocol: the first
+// recognized entry in the client's offer list wins — `rime.v1.binary`
+// selects binary frames, `rime.v1.json` selects JSON text frames — and the
+// server echoes the selected subprotocol. Offering no subprotocol selects
+// JSON. Offering only unrecognized values also selects JSON but echoes no
+// subprotocol, which spec-compliant clients (RFC 6455 section 4.1; all
+// browsers) treat as a failed handshake — offer one of the values above, or
+// none.
+//
+// A *context* is one continuous synthesis. It is either one-shot (opened by a
+// `start` whose `text` is the whole input) or streaming (opened by a `start`
+// with empty `text`, then fed by `text` chunks and closed by `end`); either
+// way the audio is a single continuous stream. Per context the server emits
+// `started`, then zero or more `audio` payloads, then exactly one terminal
+// event: `done`, `cancelled`, or `error`. Multiple contexts may be open
+// concurrently on one connection; events are correlated by `context_id`.
+//
+// Authentication: preferred is an `Authorization` header on the upgrade
+// request (rejected with HTTP 401 before the socket opens). Browsers cannot
+// set WebSocket headers; they send `config.authorization` (or
+// `config.license`) as the first message instead. Debug builds skip auth.
+
+// Client -> server. Exactly one message per WebSocket frame.
+message WebSocketRequest {
+  reserved 7;
+  reserved "flush";
+
+  // Client-chosen context identifier, at most 128 bytes. Empty selects the
+  // context named "default". An identifier may be reused after its context
+  // reaches a terminal event.
+  string context_id = 1;
+
+  oneof payload {
+    // Connection-level configuration. At most one, and only before the first
+    // `start`. Not required in debug mode or when the upgrade request
+    // carried an `Authorization` header.
+    WebSocketConfig config = 2;
+
+    // Opens the context with the full synthesis parameters. A non-empty
+    // `text` is the complete input for one-shot synthesis: audio streams
+    // and ends with `done`, no `end` required. An empty `text` opens a
+    // streaming context that stays open for `text` messages and finalizes
+    // on `end`.
+    SynthesisRequest start = 3;
+
+    // Appends a chunk of input text to an open streaming context (one opened
+    // with an empty `start.text`). The engine meters, segments, and
+    // synthesizes it into the same continuous audio as it arrives. Rejected
+    // with kind "invalid_input" if the context is not open for input (no
+    // `start`, or already `end`ed / one-shot).
+    string text = 4;
+
+    // Declares end of input for a streaming context. Remaining audio is
+    // delivered, followed by `done`. A no-op for a one-shot context. The
+    // connection stays open for further contexts.
+    WebSocketEnd end = 5;
+
+    // Aborts the context immediately, discarding in-flight synthesis.
+    // Acknowledged with `cancelled`; idempotent (cancelling an unknown or
+    // finished context is not an error).
+    WebSocketCancel cancel = 6;
+  }
+}
+
+message WebSocketConfig {
+  // Mirrors the HTTP `Authorization` header, e.g. "Api-Key <key>".
+  // Rejected if the upgrade request already carried an Authorization header.
+  optional string authorization = 1;
+
+  // License JSON for on-prem deployments; mirrors the `x-rime-license`
+  // gRPC metadata / the `license` field of the HTTP API.
+  optional string license = 2;
+
+  // Defaults merged (field-wise, shallow) under every subsequent `start`.
+  // Its `text` field is ignored.
+  optional SynthesisRequest defaults = 3;
+}
+
+message WebSocketEnd {}
+
+message WebSocketCancel {}
+
+// Server -> client. Exactly one message per WebSocket frame.
+message WebSocketResponse {
+  // Context the payload applies to. Empty for connection-scoped payloads
+  // (`ready` and connection-level `error`s).
+  string context_id = 1;
+
+  oneof payload {
+    // Sent once per connection when the engine is ready to synthesize
+    // (pipelines loaded and serving). Gate `start` on this event.
+    WebSocketReady ready = 2;
+
+    // The context was accepted; precedes any of its audio.
+    WebSocketStarted started = 3;
+
+    // A chunk of encoded audio, in the format requested at `start`.
+    bytes audio = 4;
+
+    // Terminal: all audio for the context has been delivered.
+    WebSocketDone done = 5;
+
+    // Terminal: the context was aborted by `cancel`.
+    WebSocketCancelled cancelled = 6;
+
+    // Terminal for the context it names. Errors with an empty `context_id`
+    // are connection-scoped and leave open contexts running; the server
+    // closes the connection only when the failure is unrecoverable
+    // (undecodable frames, failed authentication).
+    WebSocketError error = 7;
+  }
+}
+
+message WebSocketReady {
+  // Protocol version. Currently 1.
+  uint32 protocol = 1;
+
+  // Supported BCP-47 language tags (mirrors GetSupportedLanguages).
+  repeated string languages = 2;
+
+  optional string default_language = 3;
+}
+
+message WebSocketStarted {
+  // Engine request id for this context; correlates with engine logs and
+  // matches the `x-request-id` gRPC/HTTP metadata.
+  string request_id = 1;
+}
+
+message WebSocketDone {
+  // Present when `start.timestamps.enable` was set.
+  optional Timestamps timestamps = 1;
+}
+
+message WebSocketCancelled {}
+
+message WebSocketError {
+  // Stable machine-readable kind; same values as the HTTP error body
+  // (e.g. "invalid_input", "unauthenticated", "unavailable", "internal",
+  // "unimplemented").
+  string kind = 1;
+
+  // Human-readable description.
+  string message = 2;
+
+  // Engine request id, when the error occurred inside a synthesis request.
+  optional string request_id = 3;
+}

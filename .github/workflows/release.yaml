@@ -197,6 +197,11 @@ jobs:
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
           done
+      - uses: actions/setup-go@v6
+        if: steps.published.outputs.ready == 'true'
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
       - name: Create the verified tag and GitHub release
         if: steps.published.outputs.ready == 'true'
         env:

@@ -145,3 +145,13 @@ js_test(
     data = ["//:schema_source_workflow"],
     entry_point = "schema_source_workflow_test.mjs",
 )
+
+exports_files(["fixtures.json"])
+
+py_test(
+    name = "update_go_test",
+    size = "small",
+    srcs = ["update_go_test.py"],
+    legacy_create_init = 0,
+    deps = ["//tools:go_updater"],
+)

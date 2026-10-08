@@ -325,12 +325,25 @@ class ReleaseAutomationTest(unittest.TestCase):
                 release.published_release(self.directory)
 
     def finalize(
-        self, tag_target=None, existing=None, asset_contents=None, draft_visible=True
+        self,
+        tag_target=None,
+        existing=None,
+        asset_contents=None,
+        draft_visible=True,
+        go=False,
+        go_error=False,
     ):
         commands = []
+        if go:
+            self.record["go_tree"] = "d" * 40
+            (self.directory / "RELEASE.json").write_text(json.dumps(self.record))
 
         def command(*arguments):
             commands.append(arguments)
+            if arguments[:2] == ("git", "rev-parse"):
+                return ("d" * 40).encode()
+            if arguments[:2] == ("bash", "tools/check_go_release.sh") and go_error:
+                raise ValueError("Go download failed")
             if arguments[:2] == ("git", "ls-remote"):
                 if tag_target:
                     # Annotated tag object differs from the commit it resolves to.
@@ -359,6 +372,7 @@ class ReleaseAutomationTest(unittest.TestCase):
             return []
 
         with (
+            patch.object(release, "go_module_present", return_value=go),
             patch.object(release, "published_release", return_value=True),
             patch.object(release, "commit_file", return_value=self.version),
             patch.object(release, "release_pull_request", return_value=42),
@@ -383,6 +397,42 @@ class ReleaseAutomationTest(unittest.TestCase):
         ):
             release.finalize_release(self.directory)
         return commands
+
+    def test_go_release_checks_run_before_github_release(self):
+        commands = self.finalize(go=True)
+        go_tag = next(
+            i
+            for i, args in enumerate(commands)
+            if f"ref=refs/tags/go/v{self.version}" in args
+        )
+        verification = commands.index(
+            ("bash", "tools/check_go_release.sh", self.version, self.commit)
+        )
+        package_tag = next(
+            i
+            for i, args in enumerate(commands)
+            if f"ref=refs/tags/v{self.version}" in args
+        )
+        self.assertLess(go_tag, verification)
+        self.assertLess(verification, package_tag)
+
+    def test_go_download_failure_stops_finalization(self):
+        with self.assertRaisesRegex(ValueError, "Go download failed"):
+            self.finalize(go=True, go_error=True)
+
+    def test_go_jobs_are_required_only_for_commits_with_the_module(self):
+        jobs = [
+            {"name": name, "conclusion": "success"}
+            for name in ("build", "python (3.13)", "javascript (24)")
+        ]
+        release.validate_jobs(jobs, False)
+        with self.assertRaisesRegex(ValueError, "including Go"):
+            release.validate_jobs(jobs, True)
+        jobs.append({"name": "go (1.24.x)", "conclusion": "success"})
+        release.validate_jobs(jobs, True)
+        jobs[-1]["conclusion"] = "skipped"
+        with self.assertRaisesRegex(ValueError, "including Go"):
+            release.validate_jobs(jobs, True)
 
     def test_finalizes_when_created_draft_is_absent_from_release_list(self):
         commands = self.finalize(draft_visible=False)

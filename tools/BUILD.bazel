@@ -3,6 +3,20 @@ load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 
+exports_files([
+    "go.mod",
+    "go.sum",
+    "update_go.py",
+])
+
+py_binary(
+    name = "build_go",
+    srcs = ["build_go.py"],
+    legacy_create_init = 0,
+    visibility = ["//visibility:public"],
+    deps = ["@pip//grpcio_tools"],
+)
+
 py_binary(
     name = "check_compatibility",
     srcs = ["check_compatibility.py"],
@@ -59,5 +73,11 @@ format_multirun(
 py_library(
     name = "schema_source",
     srcs = ["check_schema_source.py"],
+    visibility = ["//tests:__pkg__"],
+)
+
+py_library(
+    name = "go_updater",
+    srcs = ["update_go.py"],
     visibility = ["//tests:__pkg__"],
 )

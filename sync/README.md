@@ -12,7 +12,7 @@ Change schemas there, then use Copybara to export them here.
 
 [copy.bara.sky](../copy.bara.sky) lists those exact files. It does not export
 the internal model protocol or other files added under `interfaces`.
-Build rules, package metadata, tests, and release tooling belong to this
+Build rules, package metadata, tests, generated Go code, and release tooling belong to this
 repository and are outside Copybara's destination file list.
 
 Copybara creates a commit on `sync/public-api`. The workflow opens a PR against
@@ -25,6 +25,8 @@ private commit descriptions or author addresses.
 schemas. The sync job passes this revision to Copybara, keeps its last-revision
 consistency check enabled, and updates the file from the exported commit's
 `GitOrigin-RevId` trailer. The revision file survives squash merges.
+The job runs `bazel run //:update_go` and includes generated Go changes in the
+same PR. Package CI rejects a stale generated module.
 `sync/INITIAL_REVISION` is the historical bootstrap record; it no longer selects
 the current baseline.
 

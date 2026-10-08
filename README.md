@@ -1,6 +1,6 @@
 # Rime API
 
-Public API definitions and generated Python and JavaScript packages for Rime
+Public API definitions and generated Python, JavaScript, and Go packages for Rime
 text-to-speech and speech-to-text.
 
 | Definition | Purpose |
@@ -18,11 +18,12 @@ versioning, and publication. See [schema sync](sync/README.md).
 
 Python [`rime-api`](https://pypi.org/project/rime-api/) and npm
 [`@rimelabs/api`](https://www.npmjs.com/package/@rimelabs/api) share the version
-in `VERSION`. Install them with:
+in `VERSION` with the [Go module](go/README.md). Install them with:
 
 ```shell
 uv add rime-api
 npm install @rimelabs/api @bufbuild/protobuf@^2.11.0
+go get github.com/rimelabs/rime-api/go@latest
 ```
 
 ```python
@@ -58,12 +59,13 @@ Install Bazelisk, then run these commands from this repository:
 
 ```shell
 bazel build //:packages
+bazel run //:update_go -- --check
 bazel test //tests/...
 bash tools/check_compatibility.sh
 bazel run //:format
 ```
 
-Bazel pins Python, Node.js, the generators, Buf, and Copybara. No GPU, CUDA,
+Bazel pins Python, Node.js, Go, the generators, Buf, and Copybara. No GPU, CUDA,
 private cache, or access to the source repository is needed to build or test.
 The output archives are in `bazel-bin/packages/dist/`.
 
