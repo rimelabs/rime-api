@@ -225,7 +225,10 @@ def validate_jobs(jobs, require_go):
         and any(job["name"] == "build" for job in jobs)
         and any(job["name"].startswith("python (") for job in jobs)
         and any(job["name"].startswith("javascript (") for job in jobs)
-        and (not require_go or any(job["name"].startswith("go (") for job in jobs)),
+        and (
+            not require_go
+            or {"go (1.24.x)", "go (stable)"}.issubset({job["name"] for job in jobs})
+        ),
         "Every build and installation job must pass, including Go when present",
     )
 

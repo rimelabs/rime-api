@@ -428,11 +428,27 @@ class ReleaseAutomationTest(unittest.TestCase):
         release.validate_jobs(jobs, False)
         with self.assertRaisesRegex(ValueError, "including Go"):
             release.validate_jobs(jobs, True)
-        jobs.append({"name": "go (1.24.x)", "conclusion": "success"})
-        release.validate_jobs(jobs, True)
-        jobs[-1]["conclusion"] = "skipped"
+        go_jobs = [
+            {"name": name, "conclusion": "success"}
+            for name in ("go (1.24.x)", "go (stable)")
+        ]
+        for go_job in go_jobs:
+            with self.subTest(missing_other_job=go_job["name"]):
+                with self.assertRaisesRegex(ValueError, "including Go"):
+                    release.validate_jobs(jobs + [go_job], True)
         with self.assertRaisesRegex(ValueError, "including Go"):
-            release.validate_jobs(jobs, True)
+            release.validate_jobs(
+                jobs + [{"name": "go (unrelated)", "conclusion": "success"}], True
+            )
+        jobs.extend(go_jobs)
+        release.validate_jobs(jobs, True)
+        for go_job in go_jobs:
+            for conclusion in ("failure", "skipped"):
+                with self.subTest(job=go_job["name"], conclusion=conclusion):
+                    go_job["conclusion"] = conclusion
+                    with self.assertRaisesRegex(ValueError, "including Go"):
+                        release.validate_jobs(jobs, True)
+            go_job["conclusion"] = "success"
 
     def test_finalizes_when_created_draft_is_absent_from_release_list(self):
         commands = self.finalize(draft_visible=False)
