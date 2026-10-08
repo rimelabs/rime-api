@@ -1,0 +1,43 @@
+.github/workflows/release-please.yaml
+  s_264b98dc6486d6::t_eb18268ca074f6 47-52
+.github/workflows/schema-source.yaml
+  s_264b98dc6486d6::t_d0723a16a2c7ba 1-85
+.github/workflows/sync.yaml
+  s_264b98dc6486d6::t_fe35e369b17fd3 34-35,40,65,69-76,82
+BUILD.bazel
+  s_264b98dc6486d6::t_43cf8009307b95 79-84
+sync/README.md
+  s_264b98dc6486d6::t_4679be746e361b 19-63,103-104
+sync/SOURCE_REVISION
+  s_264b98dc6486d6::t_3f889cac53800e 1
+tests/BUILD.bazel
+  s_264b98dc6486d6::t_8b3fec31959171 130-147
+tests/release_workflow_test.mjs
+  s_264b98dc6486d6::t_d2bbde0be71e22 14,49-53
+tests/schema_source_test.py
+  s_264b98dc6486d6::t_15eaf3892fadf6 1-135
+tests/schema_source_workflow_test.mjs
+  s_264b98dc6486d6::t_dc40c4aa5329e4 1-53
+tests/sync_workflow_test.py
+  s_264b98dc6486d6::t_1b3091f07d5a75 73-74,82,150-153
+tools/BUILD.bazel
+  s_264b98dc6486d6::t_5384a797fd3d4e 58-63
+tools/check_schema_source.py
+  s_264b98dc6486d6::t_e1bd877d52569f 1-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "de7691fba66ec26de0b13f38ef3238b040c956cd",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
