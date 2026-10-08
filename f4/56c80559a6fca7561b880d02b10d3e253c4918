@@ -1,0 +1,25 @@
+README.md
+  s_264b98dc6486d6::t_0032e31f495825 58
+tests/BUILD.bazel
+  s_264b98dc6486d6::t_1c4ae9efded42c 158-166
+tools/BUILD.bazel
+  s_264b98dc6486d6::t_da145d1c0439c0 7
+tools/check_go_release.sh
+  s_264b98dc6486d6::t_87240e467b6276 8,30-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f456c80559a6fca7561b880d02b10d3e253c4918",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
