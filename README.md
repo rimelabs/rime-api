@@ -55,7 +55,7 @@ cancellation, and audio playback. See [package details](packages/README.md).
 
 ## Build and test
 
-Install Bazelisk, then run these commands from this repository:
+Install Bazelisk, Git, and jq, then run these commands from this repository:
 
 ```shell
 bazel build //:packages

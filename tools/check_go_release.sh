@@ -5,6 +5,7 @@ version=${1:?Supply the stable API version}
 commit=${2:?Supply the tested commit}
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+repository=$(git rev-parse --show-toplevel)
 module=github.com/rimelabs/rime-api/go
 work=$(mktemp -d)
 trap 'chmod -R u+w "$work"; rm -rf "$work"' EXIT
@@ -26,8 +27,12 @@ for attempt in {1..40}; do
 	echo "Waiting for Go publication, attempt $attempt of 40." >&2
 	sleep 15
 done
-jq -e --arg version "v$version" --arg commit "$commit" \
-	'.Version == $version and .Origin.Hash == $commit' module.json >/dev/null
+jq -e --arg version "v$version" '.Version == $version' module.json >/dev/null
+module_directory=$(jq -er '.Dir | select(type == "string" and length > 0)' module.json)
+# Origin metadata is optional. Compare the downloaded files with the tested tree.
+mkdir "$work/expected"
+git -C "$repository" archive "$commit" go | tar -x -C "$work/expected"
+diff -r "$work/expected/go" "$module_directory"
 go get "$module@v$version"
 cat >main.go <<'GO'
 package main

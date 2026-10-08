@@ -4,6 +4,7 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_library.bzl", "py_library")
 
 exports_files([
+    "check_go_release.sh",
     "go.mod",
     "go.sum",
     "update_go.py",
