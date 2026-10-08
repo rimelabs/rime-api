@@ -204,8 +204,10 @@ jobs:
           release_commit=$(jq -er '.commit | select(type == "string") | select(test("^[0-9a-f]{40}$"))' release-dist/RELEASE.json)
           git cat-file -e "$release_commit^{commit}"
           if git cat-file -e "$release_commit:go/go.mod" 2>/dev/null; then
-            git show "$release_commit:go/go.mod" > "$RUNNER_TEMP/release-go.mod"
-            echo "version_file=$RUNNER_TEMP/release-go.mod" >> "$GITHUB_OUTPUT"
+            # setup-go recognizes module syntax only for a file named go.mod.
+            mkdir -p "$RUNNER_TEMP/release-go"
+            git show "$release_commit:go/go.mod" > "$RUNNER_TEMP/release-go/go.mod"
+            echo "version_file=$RUNNER_TEMP/release-go/go.mod" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-go@v6
         if: steps.published.outputs.ready == 'true' && steps.go_toolchain.outputs.version_file != ''
