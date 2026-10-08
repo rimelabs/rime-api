@@ -55,3 +55,9 @@ format_multirun(
     visibility = ["//visibility:public"],
     yaml = "@aspect_rules_lint//format:yamlfmt",
 )
+
+py_library(
+    name = "schema_source",
+    srcs = ["check_schema_source.py"],
+    visibility = ["//tests:__pkg__"],
+)

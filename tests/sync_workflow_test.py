@@ -70,6 +70,8 @@ class SyncWorkflowTest(unittest.TestCase):
         self.git("clone", str(self.remote), str(self.repository))
         self.git("config", "user.name", "Test Sync")
         self.git("config", "user.email", "test@example.invalid")
+        (self.repository / "sync").mkdir()
+        (self.repository / "sync/SOURCE_REVISION").write_text("a" * 40 + "\n")
         (self.repository / "schema").mkdir()
         self.schema = self.repository / "schema" / "definition"
         self.schema.write_text("baseline\n")
@@ -77,7 +79,7 @@ class SyncWorkflowTest(unittest.TestCase):
         self.git("commit", "-m", "Initial snapshot\n\nGitOrigin-RevId: baseline")
         self.git("push", "origin", "main")
         self.schema.write_text("pending change\n")
-        self.git("commit", "-am", "Pending export")
+        self.git("commit", "-am", "Pending export\n\nGitOrigin-RevId: " + "b" * 40)
         self.git("push", "origin", "HEAD:sync/public-api")
 
     def install_command(self, name, script):
@@ -145,6 +147,10 @@ class SyncWorkflowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertEqual(self.pull_requests.read_text(), "17\n")
         self.assertTrue(self.branch_exists())
+        self.assertEqual(
+            self.git("show", "origin/sync/public-api:sync/SOURCE_REVISION").strip(),
+            "b" * 40,
+        )
 
     def test_copybara_failure_preserves_pr_and_branch(self):
         result = self.run_sync_steps(2)

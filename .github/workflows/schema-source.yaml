@@ -1,0 +1,85 @@
+name: Verify schema source
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: 'Open PR number to verify; empty verifies main'
+        type: string
+        default: ''
+      allow_export_change:
+        description: 'I reviewed the changed list of public schema exports'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Dispatches always execute the trusted workflow from main.
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        id: candidate
+        env:
+          REQUESTED_PR: ${{ inputs.pull_request }}
+        with:
+          script: |
+            const requested = process.env.REQUESTED_PR;
+            const number = context.payload.pull_request?.number || (requested ? Number(requested) : null);
+            if (requested && (!Number.isSafeInteger(number) || number < 1)) {
+              throw new Error('Supply a valid PR number');
+            }
+            let sha = context.sha;
+            let requiresApproval = false;
+            if (number) {
+              const {data: pr} = await github.rest.pulls.get({...context.repo, pull_number: number});
+              if (pr.state !== 'open' || pr.base.ref !== 'main') throw new Error('Expected an open PR against main');
+              sha = pr.head.sha;
+              requiresApproval = pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}` && context.eventName !== 'workflow_dispatch';
+            }
+            core.setOutput('sha', sha);
+            await github.rest.repos.createCommitStatus({
+              ...context.repo, sha, state: 'pending', context: 'Schema source',
+              description: 'Checking exported schemas against the recorded source',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            if (requiresApproval) throw new Error('A maintainer must dispatch source verification for a fork PR');
+      - uses: astral-sh/setup-uv@v7
+      # Never check out, import, or execute code from the candidate commit.
+      # No shared build cache or artifacts are used by this credentialed step.
+      - name: Compare schemas with private source
+        env:
+          GH_TOKEN: ${{ secrets.RIME_API_SYNC_TOKEN }}
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          ALLOW_EXPORT_CHANGE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_export_change }}
+        run: |
+          test -n "$GH_TOKEN" || { echo 'The schema source credential is missing.'; exit 1; }
+          arguments=()
+          if [[ "$ALLOW_EXPORT_CHANGE" == true ]]; then arguments+=(--allow-export-change); fi
+          uv run --no-project python tools/check_schema_source.py --candidate "$CANDIDATE_SHA" "${arguments[@]}"
+      - name: Record result on the candidate commit
+        if: always() && steps.candidate.outputs.sha != ''
+        uses: actions/github-script@v7
+        env:
+          CANDIDATE_SHA: ${{ steps.candidate.outputs.sha }}
+          RESULT: ${{ job.status }}
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              ...context.repo, sha: process.env.CANDIDATE_SHA,
+              state: process.env.RESULT === 'success' ? 'success' : 'failure',
+              context: 'Schema source',
+              description: process.env.RESULT === 'success' ? 'Schemas match their recorded source' : 'Schema source verification failed',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });

@@ -11,6 +11,7 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const dispatchChecks = new AsyncFunction("github", "context", script);
 const repository = { owner: "rimelabs", repo: "rime-api" };
 const releasePullRequest = {
+  number: 42,
   user: { login: "github-actions[bot]" },
   head: {
     repo: { full_name: "rimelabs/rime-api" },
@@ -45,6 +46,11 @@ test("checks run on the release branch, including unchanged PR retries", async (
     ...repository,
     workflow_id: "check.yaml",
     ref: releasePullRequest.head.ref,
+  }, {
+    ...repository,
+    workflow_id: "schema-source.yaml",
+    ref: "main",
+    inputs: { pull_request: "42" },
   }];
   assert.deepEqual(await dispatch([releasePullRequest]), expected);
   assert.deepEqual(await dispatch([releasePullRequest]), expected);

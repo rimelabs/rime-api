@@ -31,15 +31,13 @@ jobs:
       - name: Export schemas with Copybara
         id: export
         run: |
-          arguments=()
-          if [[ -z $(git log -1 --format=%H --grep='^GitOrigin-RevId: ') ]]; then
-            arguments+=("--last-rev=$(cat sync/INITIAL_REVISION)")
-          fi
+          revision=$(cat sync/SOURCE_REVISION)
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid source revision.'; exit 1; }
           status=0
           bazel run //tools:copybara -- migrate "$PWD/copy.bara.sky" public_api \
             --git-committer-name='Rime API Sync' \
             --git-committer-email=noreply@rime.ai \
-            --git-destination-non-fast-forward "${arguments[@]}" || status=$?
+            --git-destination-non-fast-forward --last-rev="$revision" || status=$?
           # Copybara returns 4 when the selected source files have no changes.
           if [[ "$status" != 0 && "$status" != 4 ]]; then
             exit "$status"
@@ -64,15 +62,24 @@ jobs:
             exit 0
           fi
           git fetch origin sync/public-api
+          exported_commit=$(git rev-parse FETCH_HEAD)
           if git diff --quiet origin/main FETCH_HEAD -- schema; then
             exit 0
           fi
+          # Keep the exact exported revision in the tree so squash merges preserve it.
+          revision=$(git log -1 --format=%B FETCH_HEAD | sed -n 's/^GitOrigin-RevId: //p')
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Missing export revision.'; exit 1; }
+          git switch -C sync/public-api FETCH_HEAD
+          printf '%s\n' "$revision" > sync/SOURCE_REVISION
+          git add sync/SOURCE_REVISION
+          git -c user.name='Rime API Sync' -c user.email=noreply@rime.ai commit --amend --no-edit
+          git push --force-with-lease="refs/heads/sync/public-api:$exported_commit" origin HEAD:sync/public-api
           existing=$(gh pr list --head sync/public-api --base main --state open --json number --jq 'length')
           if [[ "$existing" == 0 ]]; then
             cat > /tmp/rime-api-sync-pr.md <<'BODY'
           Update the public Protobuf and AsyncAPI definitions from `rimelabs/rime`.
 
-          Copybara records the source revision in the commit. Package tests and
+          Copybara records the source revision in the commit and sync/SOURCE_REVISION. Package tests and
           schema validation must pass before merge. Review the compatibility report
           for breaking changes. Package publication is separate.
           BODY
