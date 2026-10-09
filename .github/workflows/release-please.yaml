@@ -23,6 +23,28 @@ jobs:
           target-branch: main
           # Publication verifies both registries before creating a tag or release.
           skip-github-release: true
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        with:
+          bazelisk-version: 1.x
+          repository-cache: true
+      - name: Update Rust release metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch=$(gh pr list --head release-please--branches--main --base main --state open --json headRefName --jq '.[0].headRefName // empty')
+          if [[ -z "$branch" ]]; then exit 0; fi
+          git fetch origin "$branch"
+          git switch -C "$branch" FETCH_HEAD
+          bazel run //:update_rust
+          CARGO_BAZEL_REPIN=1 bazel run //:cargo -- metadata --format-version 1 > /dev/null
+          git add rust/Cargo.toml rust/SOURCE.json Cargo.lock MODULE.bazel.lock
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore: update Rust release metadata'
+            git push
+          fi
       - name: Start checks on the release PR
         uses: actions/github-script@v7
         with:

@@ -148,6 +148,11 @@ js_test(
 
 exports_files(["fixtures.json"])
 
+test_suite(
+    name = "rust_tests",
+    tests = ["//rust:protocol_test"],
+)
+
 py_test(
     name = "update_go_test",
     size = "small",

@@ -1,5 +1,26 @@
 # Release packages
 
+Rust `rime-api` also uses `VERSION`. The build uploads its checked `.crate`
+archive with the other distributions. The Rust publication job checks out the
+tested commit, reproduces the archive with the pinned Cargo toolchain, and
+compares its bytes before publication. Registry verification checks the
+crates.io checksum and downloads the published archive. Finalization waits for
+Rust publication when the selected commit contains the Rust package. Recovery
+of older releases does not require Rust.
+
+Configure a crates.io trusted publisher for repository `rimelabs/rime-api`,
+workflow `release.yaml`, and GitHub environment `crates-release`. Restrict the
+environment to `main`. If the crate requires an initial upload before publisher
+setup, publish the reviewed initial crate with
+`bazel run //:cargo -- publish -p rime-api --locked` using a scoped crates.io token.
+This one-time bootstrap can publish the initial Rust `0.3.0` before the next
+shared release. It does not replace existing npm, Python, or Go releases.
+
+The recovery registry selector accepts `crates`; `both` retains its existing
+name and now includes every registry present in the selected release.
+The release PR workflow updates the Rust manifest, source record, and lockfile
+from `VERSION` before it dispatches checks.
+
 Python `rime-api`, npm `@rimelabs/api`, and Go
 `github.com/rimelabs/rime-api/go` share the version in `VERSION`.
 Release Please proposes version and changelog updates in a release PR.

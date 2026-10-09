@@ -15,7 +15,7 @@ on:
         required: true
         type: choice
         default: both
-        options: [npm, pypi, both]
+        options: [npm, pypi, crates, both]
 permissions:
   contents: read
   actions: read
@@ -152,10 +152,67 @@ jobs:
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
           done
+  rust:
+    needs: prepare
+    if: needs.prepare.outputs.registry == 'crates' || needs.prepare.outputs.registry == 'both'
+    runs-on: ubuntu-latest
+    environment: crates-release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dist-${{ needs.prepare.outputs.version }}
+          path: release-dist/
+      - uses: astral-sh/setup-uv@v7
+      - name: Check whether crates.io needs publication
+        id: existing
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry crates --directory release-dist >> "$GITHUB_OUTPUT"
+          jq -r 'if .rust_tree then "present=true\ncommit=" + .commit else "present=false" end' release-dist/RELEASE.json >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        if: steps.existing.outputs.present == 'true'
+        with:
+          ref: ${{ steps.existing.outputs.commit }}
+          path: tested
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@0.19.0
+        if: steps.existing.outputs.present == 'true'
+        with:
+          bazelisk-version: 1.x
+          repository-cache: true
+      - name: Verify Cargo reproduces the tested archive
+        if: steps.existing.outputs.present == 'true'
+        working-directory: tested
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          bazel run //:cargo -- package -p rime-api --locked
+          cmp "target/package/rime-api-$RELEASE_VERSION.crate" "../release-dist/rime-api-$RELEASE_VERSION.crate"
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.existing.outputs.crates_publish_required == 'true'
+        id: auth
+      - name: Publish to crates.io
+        if: steps.existing.outputs.crates_publish_required == 'true'
+        working-directory: tested
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: bazel run //:cargo -- publish -p rime-api --locked
+      - name: Verify the published Rust archive
+        if: steps.existing.outputs.present == 'true'
+        run: |
+          uv run --no-project --python 3.13 python tools/release.py registry \
+            --registry crates --directory release-dist --download "$RUNNER_TEMP/rust-release"
   finalize:
-    needs: [prepare, npm, pypi]
+    needs: [prepare, npm, pypi, rust]
     if: >-
-      !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.run_id != '' && (needs.npm.result == 'success' || needs.npm.result == 'skipped') && (needs.pypi.result == 'success' || needs.pypi.result == 'skipped')
+      !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.run_id != '' && (needs.npm.result == 'success' || needs.npm.result == 'skipped') && (needs.pypi.result == 'success' || needs.pypi.result == 'skipped') && (needs.rust.result == 'success' || needs.rust.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write

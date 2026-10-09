@@ -24,4 +24,11 @@ for metadata, name in [(python["project"], "rime-api"), (javascript, "@rimelabs/
         raise SystemExit(f"Unexpected license for {name}")
 if "Apache License" not in (repository / "LICENSE").read_text():
     raise SystemExit("The Apache license text is missing")
+rust = tomllib.loads((repository / "rust/Cargo.toml").read_text())["package"]
+if (
+    rust["name"] != "rime-api"
+    or rust["version"] != version
+    or rust["license"] != "Apache-2.0"
+):
+    raise SystemExit("Rust metadata must match VERSION and the API license")
 print(f"Release metadata is ready for v{version}")

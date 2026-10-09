@@ -1,0 +1,30 @@
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@rust_crates//:defs.bzl", "all_crate_deps")
+
+rust_library(
+    name = "rime_api",
+    srcs = glob(["src/**/*.rs"]),
+    compile_data = ["README.md"],
+    crate_features = ["grpc"],
+    edition = "2021",
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+    visibility = ["//visibility:public"],
+    deps = all_crate_deps(normal = True),
+)
+
+rust_test(
+    name = "protocol_test",
+    srcs = ["tests/protocol.rs"],
+    crate_root = "tests/protocol.rs",
+    data = ["//tests:fixtures.json"],
+    edition = "2021",
+    proc_macro_deps = all_crate_deps(
+        proc_macro = True,
+        proc_macro_dev = True,
+    ),
+    rustc_env = {"RIME_API_FIXTURES": "$(rootpath //tests:fixtures.json)"},
+    deps = [":rime_api"] + all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ),
+)
