@@ -1,0 +1,108 @@
+rust/Cargo.toml
+  s_c318ad644fb4fe::t_8e862195fe373d 1-30
+Cargo.toml
+  s_c318ad644fb4fe::t_8e862195fe373d 1-3
+rust/README.md
+  s_c318ad644fb4fe::t_8e862195fe373d 1-24
+rust/tests/protocol.rs
+  s_c318ad644fb4fe::t_73126501691e16 1-36
+  s_c318ad644fb4fe::t_f829cbffcb578e 37-38
+.github/workflows/release.yaml
+  s_c318ad644fb4fe::t_715c54ced13206 18,155-211,213,215
+MODULE.bazel
+  s_c318ad644fb4fe::t_8e862195fe373d 3-17
+  s_c318ad644fb4fe::t_254c956f5eaaba 18-21
+.github/workflows/release-please.yaml
+  s_c318ad644fb4fe::t_715c54ced13206 26-47
+tests/release_test.py
+  s_c318ad644fb4fe::t_5ce95f8810ca76 64-83,92
+  s_c318ad644fb4fe::t_21882b18fb53ed 84-91,93-97
+tools/update_rust.py
+  s_c318ad644fb4fe::t_8e862195fe373d 1-22,25-32,40-42,48-49,55-67
+  s_c318ad644fb4fe::t_5ce95f8810ca76 23-24,33-39,43-47,50-54
+  s_c318ad644fb4fe::t_669ed98c29de85 68-72
+rust/BUILD.bazel
+  s_c318ad644fb4fe::t_73126501691e16 1-6,8-24
+  s_c318ad644fb4fe::t_7fcc14e860763c 7
+  s_c318ad644fb4fe::t_6472eeaeb0d3c1 25-30
+BUILD.bazel
+  s_c318ad644fb4fe::t_8e862195fe373d 11-26
+  s_c318ad644fb4fe::t_7fcc14e860763c 8-10
+  s_c318ad644fb4fe::t_6951eceaa53ba6 27-29
+packages/rust.bzl
+  s_c318ad644fb4fe::t_89ae5ed559154a 35
+  s_c318ad644fb4fe::t_e17b21554ae6fb 38
+  s_c318ad644fb4fe::t_7fcc14e860763c 23-34,36-37,39-47
+  s_c318ad644fb4fe::t_8e862195fe373d 1-22
+tools/rust/Cargo.toml
+  s_c318ad644fb4fe::t_8e862195fe373d 1-9
+README.md
+  s_c318ad644fb4fe::t_5ce95f8810ca76 3,27,64,74-78
+  s_c318ad644fb4fe::t_6e561a54d73e58 79
+.gitignore
+  s_c318ad644fb4fe::t_8e862195fe373d 8
+.github/workflows/check.yaml
+  s_c318ad644fb4fe::t_a342d43d9b8fb5 42-43,50-51,129-146
+.github/workflows/sync.yaml
+  s_c318ad644fb4fe::t_a342d43d9b8fb5 75-76
+tools/rust/BUILD.bazel
+  s_c318ad644fb4fe::t_8e862195fe373d 1-10
+tools/BUILD.bazel
+  s_c318ad644fb4fe::t_8e862195fe373d 11
+tests/registry_verification_test.py
+  s_c318ad644fb4fe::t_9d42bc6f7b5890 57-75
+  s_c318ad644fb4fe::t_f787550208954a 76-95
+tools/rust/src/main.rs
+  s_c318ad644fb4fe::t_8e862195fe373d 1-37
+RELEASING.md
+  s_c318ad644fb4fe::t_5ce95f8810ca76 3-23
+tests/BUILD.bazel
+  s_c318ad644fb4fe::t_73126501691e16 151-155
+tools/check_release.py
+  s_c318ad644fb4fe::t_715c54ced13206 27-29
+  s_c318ad644fb4fe::t_ed6d527bca2a51 30-33
+AGENTS.md
+  s_c318ad644fb4fe::t_715c54ced13206 9
+tests/sync_workflow_test.py
+  s_c318ad644fb4fe::t_9d42bc6f7b5890 64-68
+rust/src/lib.rs
+  s_c318ad644fb4fe::t_8e862195fe373d 1-5,7-23
+  s_c318ad644fb4fe::t_7fcc14e860763c 6
+tools/release.py
+  s_c318ad644fb4fe::t_a342d43d9b8fb5 15,104,126,131,135-137,140-141,143-144,218-255,264,277-285,301-302,338,355-358,437-438,451-461
+  s_c318ad644fb4fe::t_7af21be9667537 462-467,501-503,512,528-529,575-577,743-745,767-769
+Cargo.lock
+  s_c318ad644fb4fe::t_5c88bd0c5b59ba 1-984
+MODULE.bazel.lock
+  s_c318ad644fb4fe::t_0baa3e0cf9c807 74-75,305-306,410,657-2036
+rust/LICENSE
+  s_c318ad644fb4fe::t_163a79ed944009 1-202
+rust/NOTICE
+  s_c318ad644fb4fe::t_e9a6601e502a38 1-6
+rust/SOURCE.json
+  s_c318ad644fb4fe::t_edfb805817ba18 1-9
+rust/src/generated/google.rpc.rs
+  s_c318ad644fb4fe::t_fcdfa83d6f95a4 1-25
+rust/src/generated/google.rpc.serde.rs
+  s_c318ad644fb4fe::t_f0c663d7dd89d4 1-127
+rust/src/generated/rime.rs
+  s_c318ad644fb4fe::t_78a9a8da858450 1-1801
+rust/src/generated/rime.serde.rs
+  s_c318ad644fb4fe::t_cce52b61fd4c55 1-5389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "93a494b6fd1195e23c618863df4c994f2d1070d2",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
