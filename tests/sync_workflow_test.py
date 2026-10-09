@@ -61,6 +61,11 @@ class SyncWorkflowTest(unittest.TestCase):
               echo generated > go/definition.pb.go
               exit 0
             fi
+            if [[ "$*" == 'run //:update_rust' ]]; then
+              mkdir -p rust/src/generated
+              echo generated > rust/src/generated/rime.rs
+              exit 0
+            fi
             exit "${COPYBARA_STATUS:-0}"
             """,
         )

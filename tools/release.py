@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tarfile
 import time
+import tomllib
 from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import urlopen
@@ -100,7 +101,7 @@ def select_release(event):
         version = inputs["version"]
         registry = inputs["registry"]
     archive_names(version)
-    require(registry in {"npm", "pypi", "both"}, "Unexpected registry")
+    require(registry in {"npm", "pypi", "crates", "both"}, "Unexpected registry")
     return {"run_id": run_id, "version": version, "registry": registry}
 
 
@@ -122,21 +123,25 @@ def validate_run(run, run_id):
     require(re.fullmatch(r"[0-9a-f]{40}", run["head_sha"]), "Invalid source commit")
 
 
-def archive_names(version):
+def archive_names(version, rust=False):
     require(
         re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", version),
         "Version must be major.minor.patch",
     )
-    return {
+    names = {
         "npm": [f"rime-api-{version}.tgz"],
         "pypi": [f"rime_api-{version}-py3-none-any.whl", f"rime_api-{version}.tar.gz"],
     }
+    if rust:
+        names["crates"] = [f"rime-api-{version}.crate"]
+    return names
 
 
-def validate_archives(files, version, schemas):
-    names = archive_names(version)
+def validate_archives(files, version, schemas, rust=False):
+    names = archive_names(version, rust)
     require(
-        set(files) == {"SOURCE.json", *names["npm"], *names["pypi"]},
+        set(files)
+        == {"SOURCE.json", *(name for values in names.values() for name in values)},
         "Unexpected artifact files",
     )
     source = json.loads(files["SOURCE.json"])
@@ -210,6 +215,44 @@ def validate_archives(files, version, schemas):
         check_python(read(f"rime_api-{version}/PKG-INFO"))
         check_contents(read, f"rime_api-{version}/")
 
+    if rust:
+        with tarfile.open(fileobj=io.BytesIO(files[names["crates"][0]])) as archive:
+            prefix = f"rime-api-{version}/"
+            package = tomllib.loads(
+                archive.extractfile(prefix + "Cargo.toml").read().decode()
+            )["package"]
+            require(
+                package["name"] == "rime-api" and package["version"] == version,
+                "Rust metadata differs",
+            )
+            require(package["license"] == "Apache-2.0", "Rust license differs")
+            require(
+                json.loads(archive.extractfile(prefix + "SOURCE.json").read())
+                == source,
+                "Rust source record differs",
+            )
+            require(
+                all(
+                    archive.getmember(prefix + "src/generated/" + name).isfile()
+                    for name in (
+                        "rime.rs",
+                        "rime.serde.rs",
+                        "google.rpc.rs",
+                        "google.rpc.serde.rs",
+                    )
+                ),
+                "Rust generated files are missing",
+            )
+
+
+def rust_module_present(commit):
+    return (
+        command(
+            "git", "ls-tree", "--name-only", commit, "--", "rust/Cargo.toml"
+        ).strip()
+        == b"rust/Cargo.toml"
+    )
+
 
 def go_module_present(commit):
     return (
@@ -218,7 +261,7 @@ def go_module_present(commit):
     )
 
 
-def validate_jobs(jobs, require_go):
+def validate_jobs(jobs, require_go, require_rust=False):
     require(
         jobs
         and all(job["conclusion"] == "success" for job in jobs)
@@ -231,6 +274,15 @@ def validate_jobs(jobs, require_go):
         ),
         "Every build and installation job must pass, including Go when present",
     )
+    if require_rust:
+        require(
+            {
+                f"rust ({os}, {version})"
+                for os in ("ubuntu-latest", "macos-latest", "windows-latest")
+                for version in ("1.88.0", "stable")
+            }.issubset({job["name"] for job in jobs}),
+            "Every Rust installation job must pass",
+        )
 
 
 def prepare(run_id, version, directory):
@@ -246,7 +298,8 @@ def prepare(run_id, version, directory):
     jobs = github_pages(
         f"actions/runs/{run_id}/attempts/{run['run_attempt']}/jobs?per_page=100", "jobs"
     )
-    validate_jobs(jobs, go_module_present(commit))
+    rust = rust_module_present(commit)
+    validate_jobs(jobs, go_module_present(commit), rust)
     artifacts = github_pages(
         f"actions/runs/{run_id}/artifacts?per_page=100", "artifacts"
     )
@@ -282,7 +335,7 @@ def prepare(run_id, version, directory):
         for name in schema_names
         if re.fullmatch(r"schema/(rime/[^/]+\.proto|[^/]+\.asyncapi\.yaml)", name)
     }
-    validate_archives(files, version, schemas)
+    validate_archives(files, version, schemas, rust)
     directory.mkdir(parents=True, exist_ok=False)
     for name, contents in files.items():
         (directory / name).write_bytes(contents)
@@ -299,6 +352,10 @@ def prepare(run_id, version, directory):
     }
     if go_module_present(commit):
         record["go_tree"] = command("git", "rev-parse", f"{commit}:go").decode().strip()
+    if rust:
+        record["rust_tree"] = (
+            command("git", "rev-parse", f"{commit}:rust").decode().strip()
+        )
     check_release_record(record)
     (directory / "RELEASE.json").write_text(json.dumps(record, indent=2) + "\n")
     print(f"Verified {version} from {commit}, test run {run_id}")
@@ -377,6 +434,8 @@ def registry_metadata(registry, version):
         if registry == "npm"
         else f"https://pypi.org/pypi/rime-api/{version}/json"
     )
+    if registry == "crates":
+        url = f"https://crates.io/api/v1/crates/rime-api/{version}"
     try:
         return json.loads(fetch(url))
     except HTTPError as error:
@@ -389,7 +448,23 @@ def compare_registry(registry, metadata, files, version):
     """Return matching published files and their URLs; reject version conflicts."""
     if metadata is None:
         return {}
-    names = archive_names(version)[registry]
+    names = archive_names(version, rust=registry == "crates")[registry]
+    if registry == "crates":
+        require(
+            metadata["version"]["crate"] == "rime-api"
+            and metadata["version"]["num"] == version,
+            "Unexpected Rust version",
+        )
+        require(
+            metadata["version"]["checksum"]
+            == hashlib.sha256(files[names[0]]).hexdigest(),
+            "crates.io already has different bytes for this version",
+        )
+        return {
+            names[
+                0
+            ]: f"https://static.crates.io/crates/rime-api/rime-api-{version}.crate"
+        }
     if registry == "npm":
         require(
             metadata["name"] == "@rimelabs/api" and metadata["version"] == version,
@@ -423,6 +498,9 @@ def compare_registry(registry, metadata, files, version):
 def check_registry(registry, directory, download):
     record = json.loads((directory / "RELEASE.json").read_text())
     version = record["version"]
+    if registry == "crates" and "rust_tree" not in record:
+        print("crates_publish_required=false")
+        return
     files = {name: (directory / name).read_bytes() for name in record["sha256"]}
     require(
         all(
@@ -431,7 +509,7 @@ def check_registry(registry, directory, download):
         ),
         "Prepared archive checksum differs",
     )
-    names = archive_names(version)[registry]
+    names = archive_names(version, rust=registry == "crates")[registry]
     deadline = time.monotonic() + PUBLICATION_WAIT_SECONDS
     while True:
         published = compare_registry(
@@ -447,6 +525,8 @@ def check_registry(registry, directory, download):
                     if registry == "npm"
                     else "files.pythonhosted.org"
                 )
+                if registry == "crates":
+                    expected_host = "static.crates.io"
                 require(
                     urlparse(url).scheme == "https"
                     and urlparse(url).hostname == expected_host,
@@ -492,7 +572,9 @@ def published_release(directory):
     """Require matching files on both registries before final verification."""
     record = json.loads((directory / "RELEASE.json").read_text())
     ready = True
-    for registry, names in archive_names(record["version"]).items():
+    for registry, names in archive_names(
+        record["version"], rust="rust_tree" in record
+    ).items():
         files = {name: (directory / name).read_bytes() for name in names}
         require(
             all(
@@ -658,7 +740,9 @@ def main():
     preparation.add_argument("--version", required=True)
     preparation.add_argument("--directory", type=Path, required=True)
     registry = commands.add_parser("registry")
-    registry.add_argument("--registry", choices=["npm", "pypi", "both"], required=True)
+    registry.add_argument(
+        "--registry", choices=["npm", "pypi", "crates", "both"], required=True
+    )
     registry.add_argument("--directory", type=Path, required=True)
     registry.add_argument("--download", type=Path)
     arguments = parser.parse_args()
@@ -680,7 +764,9 @@ def main():
             "Download one registry at a time",
         )
         for name in (
-            ["npm", "pypi"] if arguments.registry == "both" else [arguments.registry]
+            ["npm", "pypi", "crates"]
+            if arguments.registry == "both"
+            else [arguments.registry]
         ):
             check_registry(name, arguments.directory, arguments.download)
 

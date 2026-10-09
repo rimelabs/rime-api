@@ -5,6 +5,28 @@ load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("//packages:go.bzl", "go_protocol")
 load("//packages:packages.bzl", "api_packages")
+load("//packages:rust.bzl", "rust_cargo", "rust_protocol")
+
+rust_cargo(name = "cargo")
+
+exports_files([
+    "Cargo.toml",
+    "Cargo.lock",
+])
+
+rust_protocol(
+    name = "rust_protocol",
+    schema_workspace = "//schema:workspace",
+)
+
+py_binary(
+    name = "update_rust",
+    srcs = ["//tools:update_rust.py"],
+    args = ["$(rootpath :rust_protocol)"],
+    data = [":rust_protocol"],
+    legacy_create_init = 0,
+    main = "//tools:update_rust.py",
+)
 
 go_protocol(
     name = "go_protocol",

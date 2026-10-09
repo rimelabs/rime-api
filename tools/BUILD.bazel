@@ -8,6 +8,7 @@ exports_files([
     "go.mod",
     "go.sum",
     "update_go.py",
+    "update_rust.py",
 ])
 
 py_binary(

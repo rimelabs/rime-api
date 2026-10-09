@@ -1,6 +1,6 @@
 # Rime API
 
-Public API definitions and generated Python, JavaScript, and Go packages for Rime
+Public API definitions and generated Python, JavaScript, Go, and Rust packages for Rime
 text-to-speech and speech-to-text.
 
 | Definition | Purpose |
@@ -24,6 +24,7 @@ in `VERSION` with the [Go module](go/README.md). Install them with:
 uv add rime-api
 npm install @rimelabs/api @bufbuild/protobuf@^2.11.0
 go get github.com/rimelabs/rime-api/go@latest
+cargo add rime-api
 ```
 
 ```python
@@ -60,6 +61,7 @@ Install Bazelisk, Git, and jq, then run these commands from this repository:
 ```shell
 bazel build //:packages
 bazel run //:update_go -- --check
+bazel run //:update_rust -- --check
 bazel test //tests/...
 bash tools/check_compatibility.sh
 bazel run //:format
@@ -68,6 +70,12 @@ bazel run //:format
 Bazel pins Python, Node.js, Go, the generators, Buf, and Copybara. No GPU, CUDA,
 private cache, or access to the source repository is needed to build or test.
 The output archives are in `bazel-bin/packages/dist/`.
+
+The [Rust crate](rust/README.md) contains generated TTS and STT messages with
+Protobuf JSON support. Its default `grpc` feature includes Tonic clients and
+servers. It requires Rust 1.88 or newer. Use `bazel run //:cargo -- test -p rime-api`
+for Cargo checks and `bazel run //:cargo -- package -p rime-api --locked` for the
+crate archive in `target/package/`. Consumers do not need Bazel or protoc.
 
 The tests cover shared binary and JSON fixtures, Python imports and typing,
 JavaScript module formats, and Copybara export behavior. CI also installs the

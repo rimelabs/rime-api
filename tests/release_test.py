@@ -61,6 +61,40 @@ class ReleaseTest(unittest.TestCase):
     def test_accepts_built_archives(self):
         release.validate_archives(self.files, self.version, self.schemas)
 
+    def test_rust_archive_is_required_and_validated_when_present_in_commit(self):
+        files = dict(self.files)
+        with self.assertRaisesRegex(ValueError, "Unexpected artifact files"):
+            release.validate_archives(files, self.version, self.schemas, rust=True)
+        output = io.BytesIO()
+        contents = {
+            "Cargo.toml": f'[package]\nname = "rime-api"\nversion = "{self.version}"\nlicense = "Apache-2.0"\n'.encode(),
+            "SOURCE.json": files["SOURCE.json"],
+        }
+        for name in (
+            "rime.rs",
+            "rime.serde.rs",
+            "google.rpc.rs",
+            "google.rpc.serde.rs",
+        ):
+            contents[f"src/generated/{name}"] = b"// generated\n"
+        with tarfile.open(fileobj=output, mode="w:gz") as archive:
+            for name, data in contents.items():
+                member = tarfile.TarInfo(f"rime-api-{self.version}/{name}")
+                member.size = len(data)
+                archive.addfile(member, io.BytesIO(data))
+        name = release.archive_names(self.version, rust=True)["crates"][0]
+        files[name] = output.getvalue()
+        release.validate_archives(files, self.version, self.schemas, rust=True)
+        files[name] = rewrite_archive(
+            name,
+            files[name],
+            lambda path, data: (
+                b'{"version":"wrong"}' if path.endswith("SOURCE.json") else data
+            ),
+        )
+        with self.assertRaisesRegex(ValueError, "Rust source record"):
+            release.validate_archives(files, self.version, self.schemas, rust=True)
+
     def test_rejects_wrong_source_commit(self):
         for name in self.schemas:
             with self.subTest(schema=name):

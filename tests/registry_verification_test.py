@@ -54,6 +54,45 @@ class RegistryVerificationTest(unittest.TestCase):
     def verify(self):
         release.check_registry("npm", self.directory, self.download)
 
+    def test_crates_checksum_and_download_are_verified(self):
+        name = release.archive_names(self.version, rust=True)["crates"][0]
+        metadata = {
+            "version": {
+                "crate": "rime-api",
+                "num": self.version,
+                "checksum": hashlib.sha256(self.archive).hexdigest(),
+            }
+        }
+        self.assertEqual(
+            release.compare_registry(
+                "crates", metadata, {name: self.archive}, self.version
+            ),
+            {name: f"https://static.crates.io/crates/rime-api/{name}"},
+        )
+        with self.assertRaisesRegex(ValueError, "different bytes"):
+            release.compare_registry(
+                "crates", metadata, {name: b"changed"}, self.version
+            )
+
+    def test_old_release_does_not_require_a_rust_package(self):
+        with patch.object(release, "registry_metadata") as metadata:
+            release.check_registry("crates", self.directory, None)
+        metadata.assert_not_called()
+
+    def test_rust_release_requires_all_platform_jobs(self):
+        jobs = [
+            {"name": name, "conclusion": "success"}
+            for name in ("build", "python (3.13)", "javascript (24)")
+        ]
+        with self.assertRaisesRegex(ValueError, "Rust installation"):
+            release.validate_jobs(jobs, False, True)
+        jobs.extend(
+            {"name": f"rust ({os}, {version})", "conclusion": "success"}
+            for os in ("ubuntu-latest", "macos-latest", "windows-latest")
+            for version in ("1.88.0", "stable")
+        )
+        release.validate_jobs(jobs, False, True)
+
     def test_package_available_after_three_minutes_is_verified(self):
         with (
             patch.object(

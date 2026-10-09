@@ -72,7 +72,8 @@ jobs:
           git switch -C sync/public-api FETCH_HEAD
           printf '%s\n' "$revision" > sync/SOURCE_REVISION
           bazel run //:update_go
-          git add sync/SOURCE_REVISION go
+          bazel run //:update_rust
+          git add sync/SOURCE_REVISION go rust
           git -c user.name='Rime API Sync' -c user.email=noreply@rime.ai commit --amend --no-edit
           git push --force-with-lease="refs/heads/sync/public-api:$exported_commit" origin HEAD:sync/public-api
           existing=$(gh pr list --head sync/public-api --base main --state open --json number --jq 'length')
