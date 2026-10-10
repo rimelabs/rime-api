@@ -26,7 +26,7 @@ if "Apache License" not in (repository / "LICENSE").read_text():
     raise SystemExit("The Apache license text is missing")
 rust = tomllib.loads((repository / "rust/Cargo.toml").read_text())["package"]
 if (
-    rust["name"] != "rime-api"
+    rust["name"] != "rimelabs-api"
     or rust["version"] != version
     or rust["license"] != "Apache-2.0"
 ):

@@ -193,8 +193,8 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          bazel run //:cargo -- package -p rime-api --locked
-          cmp "target/package/rime-api-$RELEASE_VERSION.crate" "../release-dist/rime-api-$RELEASE_VERSION.crate"
+          bazel run //:cargo -- package -p rimelabs-api --locked
+          cmp "target/package/rimelabs-api-$RELEASE_VERSION.crate" "../release-dist/rimelabs-api-$RELEASE_VERSION.crate"
       - uses: rust-lang/crates-io-auth-action@v1
         if: steps.existing.outputs.crates_publish_required == 'true'
         id: auth
@@ -203,7 +203,7 @@ jobs:
         working-directory: tested
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: bazel run //:cargo -- publish -p rime-api --locked
+        run: bazel run //:cargo -- publish -p rimelabs-api --locked
       - name: Verify the published Rust archive
         if: steps.existing.outputs.present == 'true'
         run: |

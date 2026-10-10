@@ -58,7 +58,7 @@ class RegistryVerificationTest(unittest.TestCase):
         name = release.archive_names(self.version, rust=True)["crates"][0]
         metadata = {
             "version": {
-                "crate": "rime-api",
+                "crate": "rimelabs-api",
                 "num": self.version,
                 "checksum": hashlib.sha256(self.archive).hexdigest(),
             }
@@ -67,11 +67,16 @@ class RegistryVerificationTest(unittest.TestCase):
             release.compare_registry(
                 "crates", metadata, {name: self.archive}, self.version
             ),
-            {name: f"https://static.crates.io/crates/rime-api/{name}"},
+            {name: f"https://static.crates.io/crates/rimelabs-api/{name}"},
         )
         with self.assertRaisesRegex(ValueError, "different bytes"):
             release.compare_registry(
                 "crates", metadata, {name: b"changed"}, self.version
+            )
+        metadata["version"]["crate"] = "rime-api"
+        with self.assertRaisesRegex(ValueError, "Unexpected Rust version"):
+            release.compare_registry(
+                "crates", metadata, {name: self.archive}, self.version
             )
 
     def test_old_release_does_not_require_a_rust_package(self):
