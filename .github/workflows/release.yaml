@@ -214,6 +214,8 @@ jobs:
     if: >-
       !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.run_id != '' && (needs.npm.result == 'success' || needs.npm.result == 'skipped') && (needs.pypi.result == 'success' || needs.pypi.result == 'skipped') && (needs.rust.result == 'success' || needs.rust.result == 'skipped')
     runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.published.outputs.ready }}
     permissions:
       contents: write
       actions: write
@@ -287,3 +289,21 @@ jobs:
         if: steps.published.outputs.ready != 'true'
         run: |
           echo 'The other registry is incomplete. Retry the same run ID and version for that registry. No tag or GitHub release was created.' >> "$GITHUB_STEP_SUMMARY"
+  notify-sdk:
+    needs: [prepare, finalize]
+    if: >-
+      !cancelled() && needs.finalize.result == 'success' && needs.finalize.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Request the SDK dependency update
+        env:
+          GH_TOKEN: ${{ secrets.RIME_SDK_UPDATE_TOKEN }}
+          API_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo 'Set RIME_SDK_UPDATE_TOKEN with Actions write access to rimelabs/rime-sdk. Publication is complete; rerun this failed job after setup.' >&2
+            exit 1
+          fi
+          gh workflow run update-api-dependencies.yml --repo rimelabs/rime-sdk \
+            --ref main --field "version=$API_VERSION"

@@ -78,6 +78,36 @@ and [PyPI pending publisher guide](https://docs.pypi.org/trusted-publishers/crea
 
 ## Routine release
 
+### SDK dependency update setup
+
+Merge the `update-api-dependencies.yml` workflow in `rimelabs/rime-sdk` before
+enabling the notification job here. Create a fine-grained GitHub token with
+resource owner `rimelabs`, access to only `rime-sdk`, and repository permission
+**Actions: Read and write**. Store it in this repository's Actions secrets as
+`RIME_SDK_UPDATE_TOKEN`. Complete organization approval if required. This token
+does not need contents or pull request write access. `GITHUB_TOKEN` from this
+repository cannot start a workflow in another repository.
+
+After finalization succeeds, **Request the SDK dependency update** starts the
+SDK workflow with the released version. The SDK workflow opens one PR with
+all four API dependencies and lockfiles, then starts package checks. Review and
+merge that PR separately. An API release does not publish the SDK.
+
+A notification failure does not undo package publication. If the secret is
+missing, expired, or cannot access the SDK, fix it and rerun the failed
+`notify-sdk` job. Do not republish the packages. You can also retry directly:
+
+```shell
+gh workflow run update-api-dependencies.yml --repo rimelabs/rime-sdk \
+  --ref main --field version=0.4.0
+```
+
+Replace the example version with the completed API release. Repeated requests
+use the same SDK update branch. The SDK's scheduled Dependabot checks remain
+available if a notification is missed.
+
+### Release steps
+
 1. Merge schema syncs and package changes into `main`. Use Conventional
    Commit messages: `fix:` for corrections, `feat:` for features, and
    `feat!:` or a `BREAKING CHANGE:` footer for breaking changes. Keep the

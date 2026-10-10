@@ -78,6 +78,46 @@ test("different versions can publish independently", () => {
   );
 });
 
+test("SDK notification waits for finalization and sends the released version", () => {
+  const job = workflow.split("  notify-sdk:\n")[1];
+  assert.match(job, /needs: \[prepare, finalize\]/);
+  assert.match(job, /needs\.finalize\.result == 'success'/);
+  assert.match(job, /needs\.finalize\.outputs\.published == 'true'/);
+  assert.match(workflow, /published: \$\{\{ steps\.published\.outputs\.ready \}\}/);
+  assert.match(job, /GH_TOKEN: \$\{\{ secrets\.RIME_SDK_UPDATE_TOKEN \}\}/);
+  assert.match(job, /API_VERSION: \$\{\{ needs\.prepare\.outputs\.version \}\}/);
+  const shell = job.split("        run: |\n")[1]
+    .split("\n").map((line) => line.slice(10)).join("\n");
+  const directory = mkdtempSync(join(tmpdir(), "sdk-notification-"));
+  try {
+    writeFileSync(join(directory, "gh"), '#!/bin/sh\nprintf "%s\\n" "$@" > "$COMMAND_LOG"\n', { mode: 0o755 });
+    const environment = {
+      ...process.env,
+      PATH: `${directory}:${process.env.PATH}`,
+      COMMAND_LOG: join(directory, "command"),
+      GH_TOKEN: "test-not-a-token",
+      API_VERSION: "0.4.0",
+    };
+    const result = spawnSync("bash", ["-euo", "pipefail", "-c", shell], {
+      env: environment, encoding: "utf8",
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readFileSync(environment.COMMAND_LOG, "utf8").trim().split("\n"), [
+      "workflow", "run", "update-api-dependencies.yml", "--repo", "rimelabs/rime-sdk",
+      "--ref", "main", "--field", "version=0.4.0",
+    ]);
+    rmSync(environment.COMMAND_LOG);
+    const missing = spawnSync("bash", ["-euo", "pipefail", "-c", shell], {
+      env: { ...environment, GH_TOKEN: "" }, encoding: "utf8",
+    });
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /Publication is complete; rerun this failed job/);
+    assert.throws(() => readFileSync(environment.COMMAND_LOG));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("finalization selects the tested Go version and supports releases before Go", () => {
   const step = workflow.split("      - name: Select the tested Go toolchain\n")[1]
     .split("      - uses:")[0];
