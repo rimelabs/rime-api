@@ -2,7 +2,7 @@ load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@rust_crates//:defs.bzl", "all_crate_deps")
 
 rust_library(
-    name = "rime_api",
+    name = "rimelabs_api",
     srcs = glob(["src/**/*.rs"]),
     compile_data = ["README.md"],
     crate_features = ["grpc"],
@@ -23,7 +23,7 @@ rust_test(
         proc_macro_dev = True,
     ),
     rustc_env = {"RIME_API_FIXTURES": "$(rootpath //tests:fixtures.json)"},
-    deps = [":rime_api"] + all_crate_deps(
+    deps = [":rimelabs_api"] + all_crate_deps(
         normal = True,
         normal_dev = True,
     ),

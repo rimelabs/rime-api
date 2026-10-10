@@ -1,5 +1,5 @@
 use prost::Message;
-use rime_api::*;
+use rimelabs_api::*;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 

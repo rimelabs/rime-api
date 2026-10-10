@@ -67,7 +67,7 @@ class ReleaseTest(unittest.TestCase):
             release.validate_archives(files, self.version, self.schemas, rust=True)
         output = io.BytesIO()
         contents = {
-            "Cargo.toml": f'[package]\nname = "rime-api"\nversion = "{self.version}"\nlicense = "Apache-2.0"\n'.encode(),
+            "Cargo.toml": f'[package]\nname = "rimelabs-api"\nversion = "{self.version}"\nlicense = "Apache-2.0"\n'.encode(),
             "SOURCE.json": files["SOURCE.json"],
         }
         for name in (
@@ -79,7 +79,7 @@ class ReleaseTest(unittest.TestCase):
             contents[f"src/generated/{name}"] = b"// generated\n"
         with tarfile.open(fileobj=output, mode="w:gz") as archive:
             for name, data in contents.items():
-                member = tarfile.TarInfo(f"rime-api-{self.version}/{name}")
+                member = tarfile.TarInfo(f"rimelabs-api-{self.version}/{name}")
                 member.size = len(data)
                 archive.addfile(member, io.BytesIO(data))
         name = release.archive_names(self.version, rust=True)["crates"][0]

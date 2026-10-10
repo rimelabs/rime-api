@@ -20,6 +20,7 @@ import zipfile
 
 
 REPOSITORY = "rimelabs/rime-api"
+RUST_PACKAGE = "rimelabs-api"
 PUBLICATION_WAIT_SECONDS = 600
 PUBLICATION_POLL_SECONDS = 10
 
@@ -133,7 +134,7 @@ def archive_names(version, rust=False):
         "pypi": [f"rime_api-{version}-py3-none-any.whl", f"rime_api-{version}.tar.gz"],
     }
     if rust:
-        names["crates"] = [f"rime-api-{version}.crate"]
+        names["crates"] = [f"{RUST_PACKAGE}-{version}.crate"]
     return names
 
 
@@ -217,12 +218,12 @@ def validate_archives(files, version, schemas, rust=False):
 
     if rust:
         with tarfile.open(fileobj=io.BytesIO(files[names["crates"][0]])) as archive:
-            prefix = f"rime-api-{version}/"
+            prefix = f"{RUST_PACKAGE}-{version}/"
             package = tomllib.loads(
                 archive.extractfile(prefix + "Cargo.toml").read().decode()
             )["package"]
             require(
-                package["name"] == "rime-api" and package["version"] == version,
+                package["name"] == RUST_PACKAGE and package["version"] == version,
                 "Rust metadata differs",
             )
             require(package["license"] == "Apache-2.0", "Rust license differs")
@@ -435,7 +436,7 @@ def registry_metadata(registry, version):
         else f"https://pypi.org/pypi/rime-api/{version}/json"
     )
     if registry == "crates":
-        url = f"https://crates.io/api/v1/crates/rime-api/{version}"
+        url = f"https://crates.io/api/v1/crates/{RUST_PACKAGE}/{version}"
     try:
         return json.loads(fetch(url))
     except HTTPError as error:
@@ -451,7 +452,7 @@ def compare_registry(registry, metadata, files, version):
     names = archive_names(version, rust=registry == "crates")[registry]
     if registry == "crates":
         require(
-            metadata["version"]["crate"] == "rime-api"
+            metadata["version"]["crate"] == RUST_PACKAGE
             and metadata["version"]["num"] == version,
             "Unexpected Rust version",
         )
@@ -463,7 +464,7 @@ def compare_registry(registry, metadata, files, version):
         return {
             names[
                 0
-            ]: f"https://static.crates.io/crates/rime-api/rime-api-{version}.crate"
+            ]: f"https://static.crates.io/crates/{RUST_PACKAGE}/{RUST_PACKAGE}-{version}.crate"
         }
     if registry == "npm":
         require(

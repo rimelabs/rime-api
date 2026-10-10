@@ -24,8 +24,11 @@ in `VERSION` with the [Go module](go/README.md). Install them with:
 uv add rime-api
 npm install @rimelabs/api @bufbuild/protobuf@^2.11.0
 go get github.com/rimelabs/rime-api/go@latest
-cargo add rime-api
+cargo add rimelabs-api
 ```
+
+The Rust crate is `rimelabs-api`, imported as `rimelabs_api`. The `rime-api`
+name on crates.io belongs to an unrelated project.
 
 ```python
 from rime_api import text_to_speech_pb2 as proto
@@ -73,8 +76,8 @@ The output archives are in `bazel-bin/packages/dist/`.
 
 The [Rust crate](rust/README.md) contains generated TTS and STT messages with
 Protobuf JSON support. Its default `grpc` feature includes Tonic clients and
-servers. It requires Rust 1.88 or newer. Use `bazel run //:cargo -- test -p rime-api`
-for Cargo checks and `bazel run //:cargo -- package -p rime-api --locked` for the
+servers. It requires Rust 1.88 or newer. Use `bazel run //:cargo -- test -p rimelabs-api`
+for Cargo checks and `bazel run //:cargo -- package -p rimelabs-api --locked` for the
 crate archive in `target/package/`. Consumers do not need Bazel or protoc.
 
 The tests cover shared binary and JSON fixtures, Python imports and typing,

@@ -6,7 +6,7 @@ to use messages alone. Requires Rust 1.88 or later.
 
 ```rust
 use prost::Message;
-use rime_api::SynthesisRequest;
+use rimelabs_api::SynthesisRequest;
 
 let request = SynthesisRequest {
     text: "Hello.".into(),

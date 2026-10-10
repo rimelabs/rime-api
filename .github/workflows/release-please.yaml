@@ -43,7 +43,7 @@ jobs:
           git add rust/Cargo.toml rust/SOURCE.json Cargo.lock MODULE.bazel.lock
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore: update Rust release metadata'
-            git push
+            git push origin "HEAD:refs/heads/$branch"
           fi
       - name: Start checks on the release PR
         uses: actions/github-script@v7
