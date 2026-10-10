@@ -1,0 +1,14 @@
+README.md
+  h_018052b8652914 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9550d0a7b38ad67e70a81d4fefabbbe0e561f299",
+  "prompts": {},
+  "humans": {
+    "h_018052b8652914": {
+      "author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
