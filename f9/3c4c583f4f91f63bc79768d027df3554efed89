@@ -1,0 +1,25 @@
+RELEASING.md
+  s_88d2a439fbab05::t_f744338660406d 81-110
+tests/release_publication_workflow_test.mjs
+  s_88d2a439fbab05::t_79ef518c6f09dd 81-120
+README.md
+  s_88d2a439fbab05::t_b3fa599d81bcd4 20-23
+.github/workflows/release.yaml
+  s_88d2a439fbab05::t_b3fa599d81bcd4 217-218,292-309
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f93c4c583f4f91f63bc79768d027df3554efed89",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
