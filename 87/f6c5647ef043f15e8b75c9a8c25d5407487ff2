@@ -1,0 +1,52 @@
+tools/release.py
+  s_c318ad644fb4fe::t_5207257b57fc39 23,137,221,226,439,455,467
+tools/check_release.py
+  s_c318ad644fb4fe::t_5207257b57fc39 29
+tests/registry_verification_test.py
+  s_c318ad644fb4fe::t_b48f50e3d69be9 61,70,76-79
+  s_c318ad644fb4fe::t_40ff3d3a7843aa 80
+rust/Cargo.toml
+  s_c318ad644fb4fe::t_5207257b57fc39 2
+.github/workflows/release-please.yaml
+  s_c318ad644fb4fe::t_5207257b57fc39 46
+tests/release_workflow_test.mjs
+  s_c318ad644fb4fe::t_b803f68bb4ffdb 2-5,73-128
+  s_c318ad644fb4fe::t_a12f85326269f4 129-130
+README.md
+  s_c318ad644fb4fe::t_f1d3b8338ab2c7 79
+  s_c318ad644fb4fe::t_b48f50e3d69be9 27,30-32,80
+RELEASING.md
+  s_c318ad644fb4fe::t_b48f50e3d69be9 3,11,15
+.github/workflows/check.yaml
+  s_c318ad644fb4fe::t_5120d293602722 50-51,143-146
+.github/workflows/release.yaml
+  s_c318ad644fb4fe::t_24b2f951268023 196-197,206
+Cargo.lock
+  s_c318ad644fb4fe::t_002a35cea19294 611-619
+MODULE.bazel.lock
+  s_c318ad644fb4fe::t_ad2857060c173f 682,684,694
+rust/BUILD.bazel
+  s_c318ad644fb4fe::t_4944b1066870c0 5,26
+rust/README.md
+  s_c318ad644fb4fe::t_d737c491fa68d1 9
+rust/tests/protocol.rs
+  s_c318ad644fb4fe::t_8199dd0756fa1b 2
+tests/release_test.py
+  s_c318ad644fb4fe::t_99cdf1ca5bda38 70,82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "87f6c5647ef043f15e8b75c9a8c25d5407487ff2",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
