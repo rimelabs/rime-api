@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/rimelabs/rime-api/compare/v0.3.0...v0.4.0) (2026-10-10)
+
+
+### Features
+
+* add Rust API crate and release support ([#18](https://github.com/rimelabs/rime-api/issues/18)) ([1159d94](https://github.com/rimelabs/rime-api/commit/1159d945273c1c796e883e9bac502c58c0293dd2))
+
+
+### Bug Fixes
+
+* use available Rust crate name and repair release PR push ([#20](https://github.com/rimelabs/rime-api/issues/20)) ([21138ae](https://github.com/rimelabs/rime-api/commit/21138aef58dc922dfcbcc57158999389439bbc5d))
+
 ## [0.3.0](https://github.com/rimelabs/rime-api/compare/v0.2.0...v0.3.0) (2026-10-08)
 
 

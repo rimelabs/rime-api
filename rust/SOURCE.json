@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "schemas": {
     "rime/speech_to_text.proto": "77131e17e7048cd989d547ff81c991151c23b896272b6bff903bd548eb8eb5b3",
     "rime/text_to_speech.proto": "964fb10df76a61b2ab89d0590f3f4922b49124bd3d12979a3790f65d837fe4e3",
