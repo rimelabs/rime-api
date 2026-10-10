@@ -16,7 +16,7 @@ versioning, and publication. See [schema sync](sync/README.md).
 
 ## Packages
 
-Python [`rime-api`](https://pypi.org/project/rime-api/) and npm
+Python [`rime-api`](https://pypi.org/project/rime-api/), npm
 [`@rimelabs/api`](https://www.npmjs.com/package/@rimelabs/api), the
 [Go module](go/README.md), and Rust
 [`rimelabs-api`](https://crates.io/crates/rimelabs-api) share the version in
