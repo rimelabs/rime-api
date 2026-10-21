@@ -40,8 +40,8 @@ pub struct SynthesisRequest {
     pub coda_parameters: ::core::option::Option<CodaParameters>,
     #[prost(message, optional, tag = "9")]
     pub mist_parameters: ::core::option::Option<MistParameters>,
-    /// Timestamps of the spoken spans of the synthesized audio, delivered in
-    /// the trailer once the audio has drained. Off unless requested.
+    /// Word timestamps of the synthesized audio (see SpanTimestamp), delivered
+    /// in the trailer once the audio has drained. Off unless requested.
     #[prost(message, optional, tag = "10")]
     pub timestamps: ::core::option::Option<TimestampOptions>,
     /// Per-request pronunciation overrides. Validated against the request
@@ -125,21 +125,29 @@ pub struct MistParameters {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct TimestampOptions {
-    /// Report a SpanTimestamp for every spoken span. Costs one aligner
+    /// Report a SpanTimestamp for every word of the request's text the voice
+    /// speaks, or of its normalized text on Mist v3 voices. Costs one aligner
     /// inference per request; never delays or fails the audio.
     #[prost(bool, tag = "1")]
     pub enable: bool,
 }
-/// One span of the text the talker spoke, as the aligner segments it: a
-/// whitespace-separated word of the request text after normalization (so
-/// numbers and abbreviations appear spelled out), or a morpheme for a
-/// language written without spaces.
+/// One spoken word of the request's text, in order: a whitespace-separated
+/// word of the text as the caller sent it, timed by the speech it was spoken
+/// as, however the voice pronounced it ("1" spoken as "one", a custom-lexicon
+/// word spoken from its pronunciation). A word the voice does not speak, such
+/// as punctuation alone or a word the voice's text rules remove, has no span.
+/// On a streaming request the text is the chunks joined as sent, so a chunk
+/// that does not end in whitespace shares its last word with the next
+/// chunk's first ("there." then "How" give "there.How"). Mist v3 voices name
+/// each span with the word as their text normalization wrote it ("one" for
+/// "1") instead.
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SpanTimestamp {
+    /// The word, such as "1" or "LiveKit".
     #[prost(string, tag = "1")]
     pub text: ::prost::alloc::string::String,
-    /// Offsets from the start of the synthesized audio, at the audio's native
-    /// rate and before `time_scale_factor`.
+    /// Offsets from the start of the audio as delivered, so they scale with
+    /// its duration by `time_scale_factor`: 1 s at 1.0 is 2 s at 2.0.
     #[prost(message, optional, tag = "2")]
     pub start: ::core::option::Option<::pbjson_types::Duration>,
     #[prost(message, optional, tag = "3")]
@@ -158,8 +166,9 @@ pub struct Timestamps {
     /// RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
     /// or the branch lost input under load;
     /// DEADLINE_EXCEEDED    the aligner did not answer within its budget;
-    /// UNAVAILABLE          the aligner worker is not serving;
+    /// UNAVAILABLE          the aligner did not load, or failed transiently;
     /// UNIMPLEMENTED        this package has no aligner;
+    /// INTERNAL             the alignment hit a defect in the server;
     /// CANCELLED            synthesis ended before alignment settled.
     #[prost(message, optional, tag = "1")]
     pub status: ::core::option::Option<super::google::rpc::Status>,
@@ -205,11 +214,48 @@ pub struct GetSupportedSpeakersRequest {
     #[prost(string, optional, tag = "1")]
     pub language: ::core::option::Option<::prost::alloc::string::String>,
 }
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetSupportedSpeakersResponse {
-    /// List of supported speaker names for the given language.
+    /// Names of the supported speakers.
     #[prost(string, repeated, tag = "1")]
     pub speakers: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// One entry per name in `speakers`, in the same order.
+    #[prost(message, repeated, tag = "2")]
+    pub details: ::prost::alloc::vec::Vec<SpeakerDetail>,
+    /// UUID of the speaker map snapshot this image was built with.
+    #[prost(string, optional, tag = "3")]
+    pub snapshot_uuid: ::core::option::Option<::prost::alloc::string::String>,
+}
+/// One speaker from the speaker map.
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SpeakerDetail {
+    /// The name a request passes as `speaker`, e.g. "astra".
+    #[prost(string, tag = "1")]
+    pub name: ::prost::alloc::string::String,
+    /// Languages the speaker is offered in, primary first, e.g. \["en-us"\].
+    #[prost(string, repeated, tag = "2")]
+    pub locales: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    /// True for a featured voice.
+    #[prost(bool, tag = "3")]
+    pub flagship: bool,
+    /// Unspecified when not recorded.
+    #[prost(enumeration = "SpeakerGender", tag = "4")]
+    pub gender: i32,
+    /// Unspecified when not recorded.
+    #[prost(enumeration = "SpeakerAge", tag = "5")]
+    pub age: i32,
+    /// Regional or social variety, e.g. "Californian".
+    #[prost(string, optional, tag = "6")]
+    pub accent: ::core::option::Option<::prost::alloc::string::String>,
+    /// The speaker's self-described background.
+    #[prost(string, optional, tag = "7")]
+    pub demographic: ::core::option::Option<::prost::alloc::string::String>,
+    /// One sentence describing the voice.
+    #[prost(string, optional, tag = "8")]
+    pub description: ::core::option::Option<::prost::alloc::string::String>,
+    /// Style words, e.g. \["formal", "most energetic"\].
+    #[prost(string, repeated, tag = "9")]
+    pub styles: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Client -> server. Exactly one message per WebSocket frame.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -386,6 +432,77 @@ impl SplitStrategy {
             "SPLIT_STRATEGY_SENTENCE" => Some(Self::Sentence),
             "SPLIT_STRATEGY_NONE" => Some(Self::None),
             "SPLIT_STRATEGY_ACCUMULATE_SENTENCE" => Some(Self::AccumulateSentence),
+            _ => None,
+        }
+    }
+}
+/// The speaker's gender.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum SpeakerGender {
+    /// Not recorded.
+    Unspecified = 0,
+    Male = 1,
+    Female = 2,
+    NonBinary = 3,
+}
+impl SpeakerGender {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "SPEAKER_GENDER_UNSPECIFIED",
+            Self::Male => "SPEAKER_GENDER_MALE",
+            Self::Female => "SPEAKER_GENDER_FEMALE",
+            Self::NonBinary => "SPEAKER_GENDER_NON_BINARY",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "SPEAKER_GENDER_UNSPECIFIED" => Some(Self::Unspecified),
+            "SPEAKER_GENDER_MALE" => Some(Self::Male),
+            "SPEAKER_GENDER_FEMALE" => Some(Self::Female),
+            "SPEAKER_GENDER_NON_BINARY" => Some(Self::NonBinary),
+            _ => None,
+        }
+    }
+}
+/// The speaker's age, binned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum SpeakerAge {
+    /// Not recorded.
+    Unspecified = 0,
+    /// Under 30.
+    YoungAdult = 1,
+    /// 30 to 50.
+    Adult = 2,
+    /// Over 50.
+    Elder = 3,
+}
+impl SpeakerAge {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Unspecified => "SPEAKER_AGE_UNSPECIFIED",
+            Self::YoungAdult => "SPEAKER_AGE_YOUNG_ADULT",
+            Self::Adult => "SPEAKER_AGE_ADULT",
+            Self::Elder => "SPEAKER_AGE_ELDER",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "SPEAKER_AGE_UNSPECIFIED" => Some(Self::Unspecified),
+            "SPEAKER_AGE_YOUNG_ADULT" => Some(Self::YoungAdult),
+            "SPEAKER_AGE_ADULT" => Some(Self::Adult),
+            "SPEAKER_AGE_ELDER" => Some(Self::Elder),
             _ => None,
         }
     }
