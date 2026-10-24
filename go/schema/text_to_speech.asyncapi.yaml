@@ -53,10 +53,15 @@ info:
 
     ### Authentication
 
-    Preferred is an `Authorization` header on the upgrade request (rejected
-    with HTTP 401 before the socket opens). Browsers cannot set WebSocket
-    headers; they send `config.authorization` (or `config.license`) as the
-    first message instead. Debug builds skip auth.
+    Endpoints that require authentication accept `Authorization: Bearer <api-key>`
+    on the upgrade request. Missing or invalid credentials return HTTP 401;
+    temporary authentication unavailability returns HTTP 503. Neither response
+    opens a connection.
+
+    Authentication applies to the entire connection. New connections
+    authenticate separately.
+
+    The optional `config` message contains synthesis defaults only.
 
 servers:
   engine:
@@ -87,8 +92,9 @@ channels:
             Authorization:
               type: string
               description: >-
-                Optional, e.g. "Api-Key <key>". Rejected with HTTP 401 before
-                the socket opens if invalid.
+                "Bearer <api-key>", required when authentication is enabled.
+                Missing or invalid credentials return HTTP 401; temporary
+                authentication unavailability returns HTTP 503 before upgrade.
             Sec-WebSocket-Protocol:
               type: string
               description: >-
@@ -156,28 +162,16 @@ components:
       name: config
       title: Connection configuration
       summary: >-
-        At most one per connection, and only before the first `start`. Not
-        required in debug mode or when the upgrade request carried an
-        `Authorization` header.
+        Optional synthesis defaults, at most once per connection and only
+        before the first `start`.
       payload:
         type: object
         required: [config]
         properties:
           config:
             type: object
+            additionalProperties: false
             properties:
-              authorization:
-                type: string
-                description: >-
-                  Mirrors the HTTP `Authorization` header, e.g. "Api-Key
-                  <key>". Rejected if the upgrade request already carried an
-                  Authorization header.
-              license:
-                type: string
-                description: >-
-                  License JSON for on-prem deployments; mirrors the
-                  `x-rime-license` gRPC metadata / the `license` field of the
-                  HTTP API.
               defaults:
                 allOf:
                   - $ref: '#/components/schemas/synthesisRequest'
@@ -458,11 +452,11 @@ components:
       description: >-
         How the alignment branch settled. `status` is a `google.rpc.Status`
         whose `code` is a `google.rpc.Code`; only `OK` (0) carries spans.
-        Spans are those of the text the talker spoke (the request text after
-        normalization: whitespace-separated words, or morphemes for a
-        language written without spaces); offsets are durations from the
-        start of the audio at its native rate, before `timeScaleFactor`, in
-        the proto3 JSON form ("1.500s").
+        Each span is a whitespace-separated word of the request text that
+        the voice spoke, or of its normalized text on Mist v3 voices;
+        offsets are durations from the start of the audio as delivered,
+        scaled with it by `timeScaleFactor`, in the proto3 JSON form
+        ("1.500s").
       properties:
         status:
           type: object

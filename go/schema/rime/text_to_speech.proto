@@ -57,8 +57,8 @@ message SynthesisRequest {
   optional CodaParameters coda_parameters = 8;
   optional MistParameters mist_parameters = 9;
 
-  // Timestamps of the spoken spans of the synthesized audio, delivered in
-  // the trailer once the audio has drained. Off unless requested.
+  // Word timestamps of the synthesized audio (see SpanTimestamp), delivered
+  // in the trailer once the audio has drained. Off unless requested.
   optional TimestampOptions timestamps = 10;
 
   // Per-request pronunciation overrides. Validated against the request
@@ -127,19 +127,27 @@ message MistParameters {
 }
 
 message TimestampOptions {
-  // Report a SpanTimestamp for every spoken span. Costs one aligner
+  // Report a SpanTimestamp for every word of the request's text the voice
+  // speaks, or of its normalized text on Mist v3 voices. Costs one aligner
   // inference per request; never delays or fails the audio.
   bool enable = 1;
 }
 
-// One span of the text the talker spoke, as the aligner segments it: a
-// whitespace-separated word of the request text after normalization (so
-// numbers and abbreviations appear spelled out), or a morpheme for a
-// language written without spaces.
+// One spoken word of the request's text, in order: a whitespace-separated
+// word of the text as the caller sent it, timed by the speech it was spoken
+// as, however the voice pronounced it ("1" spoken as "one", a custom-lexicon
+// word spoken from its pronunciation). A word the voice does not speak, such
+// as punctuation alone or a word the voice's text rules remove, has no span.
+// On a streaming request the text is the chunks joined as sent, so a chunk
+// that does not end in whitespace shares its last word with the next
+// chunk's first ("there." then "How" give "there.How"). Mist v3 voices name
+// each span with the word as their text normalization wrote it ("one" for
+// "1") instead.
 message SpanTimestamp {
+  // The word, such as "1" or "LiveKit".
   string text = 1;
-  // Offsets from the start of the synthesized audio, at the audio's native
-  // rate and before `time_scale_factor`.
+  // Offsets from the start of the audio as delivered, so they scale with
+  // its duration by `time_scale_factor`: 1 s at 1.0 is 2 s at 2.0.
   google.protobuf.Duration start = 2;
   google.protobuf.Duration end = 3;
 }
@@ -156,8 +164,9 @@ message Timestamps {
   //   RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
   //                        or the branch lost input under load;
   //   DEADLINE_EXCEEDED    the aligner did not answer within its budget;
-  //   UNAVAILABLE          the aligner worker is not serving;
+  //   UNAVAILABLE          the aligner did not load, or failed transiently;
   //   UNIMPLEMENTED        this package has no aligner;
+  //   INTERNAL             the alignment hit a defect in the server;
   //   CANCELLED            synthesis ended before alignment settled.
   google.rpc.Status status = 1;
   repeated SpanTimestamp spans = 2;
@@ -211,8 +220,57 @@ message GetSupportedSpeakersRequest {
 }
 
 message GetSupportedSpeakersResponse {
-  // List of supported speaker names for the given language.
+  // Names of the supported speakers.
   repeated string speakers = 1;
+
+  // One entry per name in `speakers`, in the same order.
+  repeated SpeakerDetail details = 2;
+
+  // UUID of the speaker map snapshot this image was built with.
+  optional string snapshot_uuid = 3;
+}
+
+// One speaker from the speaker map.
+message SpeakerDetail {
+  // The name a request passes as `speaker`, e.g. "astra".
+  string name = 1;
+  // Languages the speaker is offered in, primary first, e.g. ["en-us"].
+  repeated string locales = 2;
+  // True for a featured voice.
+  bool flagship = 3;
+  // Unspecified when not recorded.
+  SpeakerGender gender = 4;
+  // Unspecified when not recorded.
+  SpeakerAge age = 5;
+  // Regional or social variety, e.g. "Californian".
+  optional string accent = 6;
+  // The speaker's self-described background.
+  optional string demographic = 7;
+  // One sentence describing the voice.
+  optional string description = 8;
+  // Style words, e.g. ["formal", "most energetic"].
+  repeated string styles = 9;
+}
+
+// The speaker's gender.
+enum SpeakerGender {
+  // Not recorded.
+  SPEAKER_GENDER_UNSPECIFIED = 0;
+  SPEAKER_GENDER_MALE = 1;
+  SPEAKER_GENDER_FEMALE = 2;
+  SPEAKER_GENDER_NON_BINARY = 3;
+}
+
+// The speaker's age, binned.
+enum SpeakerAge {
+  // Not recorded.
+  SPEAKER_AGE_UNSPECIFIED = 0;
+  // Under 30.
+  SPEAKER_AGE_YOUNG_ADULT = 1;
+  // 30 to 50.
+  SPEAKER_AGE_ADULT = 2;
+  // Over 50.
+  SPEAKER_AGE_ELDER = 3;
 }
 
 // ======================= WebSocket envelope =======================
