@@ -10,9 +10,9 @@ service TextToSpeech {
   // Streaming text input: the client feeds text incrementally into a single
   // continuous synthesis. The FIRST client message MUST set `header` (all
   // synthesis params; its `text` field may carry the first chunk or be empty);
-  // subsequent messages set `text_chunk`. End-of-input is signalled by the
-  // client half-closing the request stream. Audio frames stream back as they
-  // are produced.
+  // subsequent messages set `text_chunk`. End-of-input is `end` or the client
+  // half-closing the request stream, and `stop` ends the synthesis early.
+  // Audio frames stream back as they are produced.
   rpc SynthesizeStreaming(stream StreamingSynthesisRequest) returns (stream SynthesisResponseStream) {}
   rpc NormalizeText(NormalizeTextRequest) returns (NormalizeTextResponse) {}
   rpc GetSupportedLanguages(GetSupportedLanguagesRequest) returns (GetSupportedLanguagesResponse) {}
@@ -31,8 +31,26 @@ message StreamingSynthesisRequest {
     // Subsequent messages: one complete sentence to append to the live
     // synthesis.
     string text_chunk = 2;
+
+    // Ends the text: the synthesis finishes what it has, and the request
+    // stream stays open for `stop`. Half-closing the stream also ends the
+    // text. A `text_chunk` after `end` is ignored.
+    StreamingSynthesisEnd end = 4;
+
+    // Stops the synthesis where it is, before or after `end`. The response
+    // ends with the audio already made and, when the header asked for
+    // timestamps, a trailer with those of the audio synthesized until the
+    // stop took effect. That audio can run past what the client played, and
+    // spans near its end can name words that were not spoken.
+    StreamingSynthesisStop stop = 5;
   }
 }
+
+// The `end` of a `SynthesizeStreaming` request stream.
+message StreamingSynthesisEnd {}
+
+// The `stop` of a `SynthesizeStreaming` request stream.
+message StreamingSynthesisStop {}
 
 message SynthesisRequest {
   reserved 1, 7;
@@ -50,15 +68,16 @@ message SynthesisRequest {
 
   optional AudioParameters audio_parameters = 5;
 
-  // Controls how input text is split before synthesis.
-  // Defaults to SPLIT_STRATEGY_SENTENCE when unset.
+  // Controls how input text is split before synthesis. When unset, the voice
+  // package's default applies: SPLIT_STRATEGY_SENTENCE unless the package
+  // sets another.
   optional SplitStrategy split_strategy = 6;
 
   optional CodaParameters coda_parameters = 8;
   optional MistParameters mist_parameters = 9;
 
-  // Timestamps of the spoken spans of the synthesized audio, delivered in
-  // the trailer once the audio has drained. Off unless requested.
+  // Word timestamps of the synthesized audio (see SpanTimestamp), delivered
+  // in the trailer once the audio has drained. Off unless requested.
   optional TimestampOptions timestamps = 10;
 
   // Per-request pronunciation overrides. Validated against the request
@@ -127,27 +146,36 @@ message MistParameters {
 }
 
 message TimestampOptions {
-  // Report a SpanTimestamp for every spoken span. Costs one aligner
+  // Report a SpanTimestamp for every word of the request's text the voice
+  // speaks, or of its normalized text on Mist v3 voices. Costs one aligner
   // inference per request; never delays or fails the audio.
   bool enable = 1;
 }
 
-// One span of the text the talker spoke, as the aligner segments it: a
-// whitespace-separated word of the request text after normalization (so
-// numbers and abbreviations appear spelled out), or a morpheme for a
-// language written without spaces.
+// One spoken word of the request's text, in order: a whitespace-separated
+// word of the text as the caller sent it, timed by the speech it was spoken
+// as, however the voice pronounced it ("1" spoken as "one", a custom-lexicon
+// word spoken from its pronunciation). A word the voice does not speak, such
+// as punctuation alone, a word the voice's text rules remove, or a word
+// after the speech ended early, has no span.
+// On a streaming request the text is the chunks joined as sent, so a chunk
+// that does not end in whitespace shares its last word with the next
+// chunk's first ("there." then "How" give "there.How"). Mist v3 voices name
+// each span with the word as their text normalization wrote it ("one" for
+// "1") instead.
 message SpanTimestamp {
+  // The word, such as "1" or "LiveKit".
   string text = 1;
-  // Offsets from the start of the synthesized audio, at the audio's native
-  // rate and before `time_scale_factor`.
+  // Offsets from the start of the audio as delivered, so they scale with
+  // its duration by `time_scale_factor`: 1 s at 1.0 is 2 s at 2.0.
   google.protobuf.Duration start = 2;
   google.protobuf.Duration end = 3;
 }
 
-// The timestamps of one synthesis, delivered once after all audio: on gRPC
-// as `trailer.timestamps`, on WebSocket as `done.timestamps`. Absent when
-// the request did not ask for them. A non-OK status never fails the
-// synthesis that produced the audio.
+// The timestamps of one synthesis, delivered once after its audio, all of it
+// or what a stop left: on gRPC as `trailer.timestamps`, on WebSocket as
+// `done.timestamps`. Absent when the request did not ask for them. A non-OK
+// status never fails the synthesis that produced the audio.
 message Timestamps {
   // How the alignment settled, with `code` a google.rpc.Code. `OK` carries
   // spans; every other code carries none, with the reason in `message`:
@@ -156,16 +184,23 @@ message Timestamps {
   //   RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
   //                        or the branch lost input under load;
   //   DEADLINE_EXCEEDED    the aligner did not answer within its budget;
-  //   UNAVAILABLE          the aligner worker is not serving;
+  //   UNAVAILABLE          the aligner did not load, or failed transiently;
   //   UNIMPLEMENTED        this package has no aligner;
+  //   INTERNAL             the alignment hit a defect in the server;
   //   CANCELLED            synthesis ended before alignment settled.
   google.rpc.Status status = 1;
   repeated SpanTimestamp spans = 2;
 }
 
 enum SplitStrategy {
+  // Unset: the voice package's default applies.
   SPLIT_STRATEGY_UNSPECIFIED = 0;
+  // Splits each text into sentences before synthesis, e.g. "Hi there. Bye."
+  // reaches the voice model as "Hi there." and "Bye.".
   SPLIT_STRATEGY_SENTENCE = 1;
+  // Passes each text on without splitting it into sentences. A voice package
+  // that caps the text of one generation still cuts a longer one-shot text
+  // into runs of whole sentences.
   SPLIT_STRATEGY_NONE = 2;
   // Accumulates streamed sub-sentential text tokens into complete sentences
   // before synthesis. Only valid for streaming requests
@@ -211,8 +246,57 @@ message GetSupportedSpeakersRequest {
 }
 
 message GetSupportedSpeakersResponse {
-  // List of supported speaker names for the given language.
+  // Names of the supported speakers.
   repeated string speakers = 1;
+
+  // One entry per name in `speakers`, in the same order.
+  repeated SpeakerDetail details = 2;
+
+  // UUID of the speaker map snapshot this image was built with.
+  optional string snapshot_uuid = 3;
+}
+
+// One speaker from the speaker map.
+message SpeakerDetail {
+  // The name a request passes as `speaker`, e.g. "astra".
+  string name = 1;
+  // Languages the speaker is offered in, primary first, e.g. ["en-us"].
+  repeated string locales = 2;
+  // True for a featured voice.
+  bool flagship = 3;
+  // Unspecified when not recorded.
+  SpeakerGender gender = 4;
+  // Unspecified when not recorded.
+  SpeakerAge age = 5;
+  // Regional or social variety, e.g. "Californian".
+  optional string accent = 6;
+  // The speaker's self-described background.
+  optional string demographic = 7;
+  // One sentence describing the voice.
+  optional string description = 8;
+  // Style words, e.g. ["formal", "most energetic"].
+  repeated string styles = 9;
+}
+
+// The speaker's gender.
+enum SpeakerGender {
+  // Not recorded.
+  SPEAKER_GENDER_UNSPECIFIED = 0;
+  SPEAKER_GENDER_MALE = 1;
+  SPEAKER_GENDER_FEMALE = 2;
+  SPEAKER_GENDER_NON_BINARY = 3;
+}
+
+// The speaker's age, binned.
+enum SpeakerAge {
+  // Not recorded.
+  SPEAKER_AGE_UNSPECIFIED = 0;
+  // Under 30.
+  SPEAKER_AGE_YOUNG_ADULT = 1;
+  // 30 to 50.
+  SPEAKER_AGE_ADULT = 2;
+  // Over 50.
+  SPEAKER_AGE_ELDER = 3;
 }
 
 // ======================= WebSocket envelope =======================
@@ -279,6 +363,13 @@ message WebSocketRequest {
     // connection stays open for further contexts.
     WebSocketEnd end = 5;
 
+    // Stops a streaming context's synthesis where it is, before or after
+    // `end`. The context ends with `done`, whose `timestamps` cover the audio
+    // synthesized until the stop took effect; audio arriving after `stop` is
+    // part of that. Refused with kind "invalid_input" for a one-shot context,
+    // and a no-op for an unknown or finished one.
+    WebSocketStop stop = 8;
+
     // Aborts the context immediately, discarding in-flight synthesis.
     // Acknowledged with `cancelled`; idempotent (cancelling an unknown or
     // finished context is not an error).
@@ -302,6 +393,9 @@ message WebSocketConfig {
 
 message WebSocketEnd {}
 
+// The `stop` of a streaming context.
+message WebSocketStop {}
+
 message WebSocketCancel {}
 
 // Server -> client. Exactly one message per WebSocket frame.
@@ -321,7 +415,8 @@ message WebSocketResponse {
     // A chunk of encoded audio, in the format requested at `start`.
     bytes audio = 4;
 
-    // Terminal: all audio for the context has been delivered.
+    // Terminal: all audio for the context has been delivered, or after `stop`
+    // the audio made until the stop.
     WebSocketDone done = 5;
 
     // Terminal: the context was aborted by `cancel`.
@@ -352,7 +447,10 @@ message WebSocketStarted {
 }
 
 message WebSocketDone {
-  // Present when `start.timestamps.enable` was set.
+  // Present when `start.timestamps.enable` was set. After `stop`, the
+  // timestamps of the audio synthesized until the stop took effect: that
+  // audio can run past what the client played, and spans near its end can
+  // name words that were not spoken.
   optional Timestamps timestamps = 1;
 }
 

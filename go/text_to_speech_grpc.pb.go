@@ -34,9 +34,9 @@ type TextToSpeechClient interface {
 	// Streaming text input: the client feeds text incrementally into a single
 	// continuous synthesis. The FIRST client message MUST set `header` (all
 	// synthesis params; its `text` field may carry the first chunk or be empty);
-	// subsequent messages set `text_chunk`. End-of-input is signalled by the
-	// client half-closing the request stream. Audio frames stream back as they
-	// are produced.
+	// subsequent messages set `text_chunk`. End-of-input is `end` or the client
+	// half-closing the request stream, and `stop` ends the synthesis early.
+	// Audio frames stream back as they are produced.
 	SynthesizeStreaming(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[StreamingSynthesisRequest, SynthesisResponseStream], error)
 	NormalizeText(ctx context.Context, in *NormalizeTextRequest, opts ...grpc.CallOption) (*NormalizeTextResponse, error)
 	GetSupportedLanguages(ctx context.Context, in *GetSupportedLanguagesRequest, opts ...grpc.CallOption) (*GetSupportedLanguagesResponse, error)
@@ -121,9 +121,9 @@ type TextToSpeechServer interface {
 	// Streaming text input: the client feeds text incrementally into a single
 	// continuous synthesis. The FIRST client message MUST set `header` (all
 	// synthesis params; its `text` field may carry the first chunk or be empty);
-	// subsequent messages set `text_chunk`. End-of-input is signalled by the
-	// client half-closing the request stream. Audio frames stream back as they
-	// are produced.
+	// subsequent messages set `text_chunk`. End-of-input is `end` or the client
+	// half-closing the request stream, and `stop` ends the synthesis early.
+	// Audio frames stream back as they are produced.
 	SynthesizeStreaming(grpc.BidiStreamingServer[StreamingSynthesisRequest, SynthesisResponseStream]) error
 	NormalizeText(context.Context, *NormalizeTextRequest) (*NormalizeTextResponse, error)
 	GetSupportedLanguages(context.Context, *GetSupportedLanguagesRequest) (*GetSupportedLanguagesResponse, error)
