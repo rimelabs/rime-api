@@ -26,9 +26,15 @@ const (
 type SplitStrategy int32
 
 const (
+	// Unset: the voice package's default applies.
 	SplitStrategy_SPLIT_STRATEGY_UNSPECIFIED SplitStrategy = 0
-	SplitStrategy_SPLIT_STRATEGY_SENTENCE    SplitStrategy = 1
-	SplitStrategy_SPLIT_STRATEGY_NONE        SplitStrategy = 2
+	// Splits each text into sentences before synthesis, e.g. "Hi there. Bye."
+	// reaches the voice model as "Hi there." and "Bye.".
+	SplitStrategy_SPLIT_STRATEGY_SENTENCE SplitStrategy = 1
+	// Passes each text on without splitting it into sentences. A voice package
+	// that caps the text of one generation still cuts a longer one-shot text
+	// into runs of whole sentences.
+	SplitStrategy_SPLIT_STRATEGY_NONE SplitStrategy = 2
 	// Accumulates streamed sub-sentential text tokens into complete sentences
 	// before synthesis. Only valid for streaming requests
 	// (SynthesizeStreaming or the WebSocket API); a unary Synthesize request
@@ -79,12 +85,125 @@ func (SplitStrategy) EnumDescriptor() ([]byte, []int) {
 	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{0}
 }
 
+// The speaker's gender.
+type SpeakerGender int32
+
+const (
+	// Not recorded.
+	SpeakerGender_SPEAKER_GENDER_UNSPECIFIED SpeakerGender = 0
+	SpeakerGender_SPEAKER_GENDER_MALE        SpeakerGender = 1
+	SpeakerGender_SPEAKER_GENDER_FEMALE      SpeakerGender = 2
+	SpeakerGender_SPEAKER_GENDER_NON_BINARY  SpeakerGender = 3
+)
+
+// Enum value maps for SpeakerGender.
+var (
+	SpeakerGender_name = map[int32]string{
+		0: "SPEAKER_GENDER_UNSPECIFIED",
+		1: "SPEAKER_GENDER_MALE",
+		2: "SPEAKER_GENDER_FEMALE",
+		3: "SPEAKER_GENDER_NON_BINARY",
+	}
+	SpeakerGender_value = map[string]int32{
+		"SPEAKER_GENDER_UNSPECIFIED": 0,
+		"SPEAKER_GENDER_MALE":        1,
+		"SPEAKER_GENDER_FEMALE":      2,
+		"SPEAKER_GENDER_NON_BINARY":  3,
+	}
+)
+
+func (x SpeakerGender) Enum() *SpeakerGender {
+	p := new(SpeakerGender)
+	*p = x
+	return p
+}
+
+func (x SpeakerGender) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SpeakerGender) Descriptor() protoreflect.EnumDescriptor {
+	return file_rime_text_to_speech_proto_enumTypes[1].Descriptor()
+}
+
+func (SpeakerGender) Type() protoreflect.EnumType {
+	return &file_rime_text_to_speech_proto_enumTypes[1]
+}
+
+func (x SpeakerGender) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SpeakerGender.Descriptor instead.
+func (SpeakerGender) EnumDescriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{1}
+}
+
+// The speaker's age, binned.
+type SpeakerAge int32
+
+const (
+	// Not recorded.
+	SpeakerAge_SPEAKER_AGE_UNSPECIFIED SpeakerAge = 0
+	// Under 30.
+	SpeakerAge_SPEAKER_AGE_YOUNG_ADULT SpeakerAge = 1
+	// 30 to 50.
+	SpeakerAge_SPEAKER_AGE_ADULT SpeakerAge = 2
+	// Over 50.
+	SpeakerAge_SPEAKER_AGE_ELDER SpeakerAge = 3
+)
+
+// Enum value maps for SpeakerAge.
+var (
+	SpeakerAge_name = map[int32]string{
+		0: "SPEAKER_AGE_UNSPECIFIED",
+		1: "SPEAKER_AGE_YOUNG_ADULT",
+		2: "SPEAKER_AGE_ADULT",
+		3: "SPEAKER_AGE_ELDER",
+	}
+	SpeakerAge_value = map[string]int32{
+		"SPEAKER_AGE_UNSPECIFIED": 0,
+		"SPEAKER_AGE_YOUNG_ADULT": 1,
+		"SPEAKER_AGE_ADULT":       2,
+		"SPEAKER_AGE_ELDER":       3,
+	}
+)
+
+func (x SpeakerAge) Enum() *SpeakerAge {
+	p := new(SpeakerAge)
+	*p = x
+	return p
+}
+
+func (x SpeakerAge) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SpeakerAge) Descriptor() protoreflect.EnumDescriptor {
+	return file_rime_text_to_speech_proto_enumTypes[2].Descriptor()
+}
+
+func (SpeakerAge) Type() protoreflect.EnumType {
+	return &file_rime_text_to_speech_proto_enumTypes[2]
+}
+
+func (x SpeakerAge) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SpeakerAge.Descriptor instead.
+func (SpeakerAge) EnumDescriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{2}
+}
+
 type StreamingSynthesisRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*StreamingSynthesisRequest_Header
 	//	*StreamingSynthesisRequest_TextChunk
+	//	*StreamingSynthesisRequest_End
+	//	*StreamingSynthesisRequest_Stop
 	Payload       isStreamingSynthesisRequest_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -145,6 +264,24 @@ func (x *StreamingSynthesisRequest) GetTextChunk() string {
 	return ""
 }
 
+func (x *StreamingSynthesisRequest) GetEnd() *StreamingSynthesisEnd {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamingSynthesisRequest_End); ok {
+			return x.End
+		}
+	}
+	return nil
+}
+
+func (x *StreamingSynthesisRequest) GetStop() *StreamingSynthesisStop {
+	if x != nil {
+		if x, ok := x.Payload.(*StreamingSynthesisRequest_Stop); ok {
+			return x.Stop
+		}
+	}
+	return nil
+}
+
 type isStreamingSynthesisRequest_Payload interface {
 	isStreamingSynthesisRequest_Payload()
 }
@@ -161,9 +298,103 @@ type StreamingSynthesisRequest_TextChunk struct {
 	TextChunk string `protobuf:"bytes,2,opt,name=text_chunk,json=textChunk,proto3,oneof"`
 }
 
+type StreamingSynthesisRequest_End struct {
+	// Ends the text: the synthesis finishes what it has, and the request
+	// stream stays open for `stop`. Half-closing the stream also ends the
+	// text. A `text_chunk` after `end` is ignored.
+	End *StreamingSynthesisEnd `protobuf:"bytes,4,opt,name=end,proto3,oneof"`
+}
+
+type StreamingSynthesisRequest_Stop struct {
+	// Stops the synthesis where it is, before or after `end`. The response
+	// ends with the audio already made and, when the header asked for
+	// timestamps, a trailer with those of the audio synthesized until the
+	// stop took effect. That audio can run past what the client played, and
+	// spans near its end can name words that were not spoken.
+	Stop *StreamingSynthesisStop `protobuf:"bytes,5,opt,name=stop,proto3,oneof"`
+}
+
 func (*StreamingSynthesisRequest_Header) isStreamingSynthesisRequest_Payload() {}
 
 func (*StreamingSynthesisRequest_TextChunk) isStreamingSynthesisRequest_Payload() {}
+
+func (*StreamingSynthesisRequest_End) isStreamingSynthesisRequest_Payload() {}
+
+func (*StreamingSynthesisRequest_Stop) isStreamingSynthesisRequest_Payload() {}
+
+// The `end` of a `SynthesizeStreaming` request stream.
+type StreamingSynthesisEnd struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamingSynthesisEnd) Reset() {
+	*x = StreamingSynthesisEnd{}
+	mi := &file_rime_text_to_speech_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamingSynthesisEnd) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingSynthesisEnd) ProtoMessage() {}
+
+func (x *StreamingSynthesisEnd) ProtoReflect() protoreflect.Message {
+	mi := &file_rime_text_to_speech_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingSynthesisEnd.ProtoReflect.Descriptor instead.
+func (*StreamingSynthesisEnd) Descriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{1}
+}
+
+// The `stop` of a `SynthesizeStreaming` request stream.
+type StreamingSynthesisStop struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamingSynthesisStop) Reset() {
+	*x = StreamingSynthesisStop{}
+	mi := &file_rime_text_to_speech_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamingSynthesisStop) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamingSynthesisStop) ProtoMessage() {}
+
+func (x *StreamingSynthesisStop) ProtoReflect() protoreflect.Message {
+	mi := &file_rime_text_to_speech_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamingSynthesisStop.ProtoReflect.Descriptor instead.
+func (*StreamingSynthesisStop) Descriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{2}
+}
 
 type SynthesisRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -175,13 +406,14 @@ type SynthesisRequest struct {
 	// Text to synthesize.
 	Text            string           `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
 	AudioParameters *AudioParameters `protobuf:"bytes,5,opt,name=audio_parameters,json=audioParameters,proto3,oneof" json:"audio_parameters,omitempty"`
-	// Controls how input text is split before synthesis.
-	// Defaults to SPLIT_STRATEGY_SENTENCE when unset.
+	// Controls how input text is split before synthesis. When unset, the voice
+	// package's default applies: SPLIT_STRATEGY_SENTENCE unless the package
+	// sets another.
 	SplitStrategy  *SplitStrategy  `protobuf:"varint,6,opt,name=split_strategy,json=splitStrategy,proto3,enum=rime.SplitStrategy,oneof" json:"split_strategy,omitempty"`
 	CodaParameters *CodaParameters `protobuf:"bytes,8,opt,name=coda_parameters,json=codaParameters,proto3,oneof" json:"coda_parameters,omitempty"`
 	MistParameters *MistParameters `protobuf:"bytes,9,opt,name=mist_parameters,json=mistParameters,proto3,oneof" json:"mist_parameters,omitempty"`
-	// Timestamps of the spoken spans of the synthesized audio, delivered in
-	// the trailer once the audio has drained. Off unless requested.
+	// Word timestamps of the synthesized audio (see SpanTimestamp), delivered
+	// in the trailer once the audio has drained. Off unless requested.
 	Timestamps *TimestampOptions `protobuf:"bytes,10,opt,name=timestamps,proto3,oneof" json:"timestamps,omitempty"`
 	// Per-request pronunciation overrides. Validated against the request
 	// language's phonology (an ill-formed entry fails the request) and applied by
@@ -194,7 +426,7 @@ type SynthesisRequest struct {
 
 func (x *SynthesisRequest) Reset() {
 	*x = SynthesisRequest{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[1]
+	mi := &file_rime_text_to_speech_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -206,7 +438,7 @@ func (x *SynthesisRequest) String() string {
 func (*SynthesisRequest) ProtoMessage() {}
 
 func (x *SynthesisRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[1]
+	mi := &file_rime_text_to_speech_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -219,7 +451,7 @@ func (x *SynthesisRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SynthesisRequest.ProtoReflect.Descriptor instead.
 func (*SynthesisRequest) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{1}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SynthesisRequest) GetLanguage() string {
@@ -300,7 +532,7 @@ type PronunciationEntry struct {
 
 func (x *PronunciationEntry) Reset() {
 	*x = PronunciationEntry{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[2]
+	mi := &file_rime_text_to_speech_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +544,7 @@ func (x *PronunciationEntry) String() string {
 func (*PronunciationEntry) ProtoMessage() {}
 
 func (x *PronunciationEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[2]
+	mi := &file_rime_text_to_speech_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +557,7 @@ func (x *PronunciationEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PronunciationEntry.ProtoReflect.Descriptor instead.
 func (*PronunciationEntry) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{2}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PronunciationEntry) GetSpelling() string {
@@ -355,7 +587,7 @@ type SynthesisResponseStream struct {
 
 func (x *SynthesisResponseStream) Reset() {
 	*x = SynthesisResponseStream{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[3]
+	mi := &file_rime_text_to_speech_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -367,7 +599,7 @@ func (x *SynthesisResponseStream) String() string {
 func (*SynthesisResponseStream) ProtoMessage() {}
 
 func (x *SynthesisResponseStream) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[3]
+	mi := &file_rime_text_to_speech_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -380,7 +612,7 @@ func (x *SynthesisResponseStream) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SynthesisResponseStream.ProtoReflect.Descriptor instead.
 func (*SynthesisResponseStream) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{3}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SynthesisResponseStream) GetPayload() isSynthesisResponseStream_Payload {
@@ -438,7 +670,7 @@ type SynthesisResponseTrailer struct {
 
 func (x *SynthesisResponseTrailer) Reset() {
 	*x = SynthesisResponseTrailer{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[4]
+	mi := &file_rime_text_to_speech_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +682,7 @@ func (x *SynthesisResponseTrailer) String() string {
 func (*SynthesisResponseTrailer) ProtoMessage() {}
 
 func (x *SynthesisResponseTrailer) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[4]
+	mi := &file_rime_text_to_speech_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +695,7 @@ func (x *SynthesisResponseTrailer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SynthesisResponseTrailer.ProtoReflect.Descriptor instead.
 func (*SynthesisResponseTrailer) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{4}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SynthesisResponseTrailer) GetTimestamps() *Timestamps {
@@ -486,7 +718,7 @@ type AudioParameters struct {
 
 func (x *AudioParameters) Reset() {
 	*x = AudioParameters{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[5]
+	mi := &file_rime_text_to_speech_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +730,7 @@ func (x *AudioParameters) String() string {
 func (*AudioParameters) ProtoMessage() {}
 
 func (x *AudioParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[5]
+	mi := &file_rime_text_to_speech_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,7 +743,7 @@ func (x *AudioParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AudioParameters.ProtoReflect.Descriptor instead.
 func (*AudioParameters) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{5}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AudioParameters) GetAudioFormat() string {
@@ -552,7 +784,7 @@ type CodaParameters struct {
 
 func (x *CodaParameters) Reset() {
 	*x = CodaParameters{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[6]
+	mi := &file_rime_text_to_speech_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -564,7 +796,7 @@ func (x *CodaParameters) String() string {
 func (*CodaParameters) ProtoMessage() {}
 
 func (x *CodaParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[6]
+	mi := &file_rime_text_to_speech_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -577,7 +809,7 @@ func (x *CodaParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CodaParameters.ProtoReflect.Descriptor instead.
 func (*CodaParameters) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{6}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CodaParameters) GetTextLookaheadTokens() int32 {
@@ -599,7 +831,7 @@ type MistParameters struct {
 
 func (x *MistParameters) Reset() {
 	*x = MistParameters{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[7]
+	mi := &file_rime_text_to_speech_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +843,7 @@ func (x *MistParameters) String() string {
 func (*MistParameters) ProtoMessage() {}
 
 func (x *MistParameters) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[7]
+	mi := &file_rime_text_to_speech_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +856,7 @@ func (x *MistParameters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MistParameters.ProtoReflect.Descriptor instead.
 func (*MistParameters) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{7}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *MistParameters) GetPauseBetweenBrackets() bool {
@@ -657,7 +889,8 @@ func (x *MistParameters) GetSaveOovs() bool {
 
 type TimestampOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Report a SpanTimestamp for every spoken span. Costs one aligner
+	// Report a SpanTimestamp for every word of the request's text the voice
+	// speaks, or of its normalized text on Mist v3 voices. Costs one aligner
 	// inference per request; never delays or fails the audio.
 	Enable        bool `protobuf:"varint,1,opt,name=enable,proto3" json:"enable,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -666,7 +899,7 @@ type TimestampOptions struct {
 
 func (x *TimestampOptions) Reset() {
 	*x = TimestampOptions{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[8]
+	mi := &file_rime_text_to_speech_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +911,7 @@ func (x *TimestampOptions) String() string {
 func (*TimestampOptions) ProtoMessage() {}
 
 func (x *TimestampOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[8]
+	mi := &file_rime_text_to_speech_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +924,7 @@ func (x *TimestampOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimestampOptions.ProtoReflect.Descriptor instead.
 func (*TimestampOptions) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{8}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TimestampOptions) GetEnable() bool {
@@ -701,15 +934,23 @@ func (x *TimestampOptions) GetEnable() bool {
 	return false
 }
 
-// One span of the text the talker spoke, as the aligner segments it: a
-// whitespace-separated word of the request text after normalization (so
-// numbers and abbreviations appear spelled out), or a morpheme for a
-// language written without spaces.
+// One spoken word of the request's text, in order: a whitespace-separated
+// word of the text as the caller sent it, timed by the speech it was spoken
+// as, however the voice pronounced it ("1" spoken as "one", a custom-lexicon
+// word spoken from its pronunciation). A word the voice does not speak, such
+// as punctuation alone, a word the voice's text rules remove, or a word
+// after the speech ended early, has no span.
+// On a streaming request the text is the chunks joined as sent, so a chunk
+// that does not end in whitespace shares its last word with the next
+// chunk's first ("there." then "How" give "there.How"). Mist v3 voices name
+// each span with the word as their text normalization wrote it ("one" for
+// "1") instead.
 type SpanTimestamp struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	// Offsets from the start of the synthesized audio, at the audio's native
-	// rate and before `time_scale_factor`.
+	// The word, such as "1" or "LiveKit".
+	Text string `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	// Offsets from the start of the audio as delivered, so they scale with
+	// its duration by `time_scale_factor`: 1 s at 1.0 is 2 s at 2.0.
 	Start         *durationpb.Duration `protobuf:"bytes,2,opt,name=start,proto3" json:"start,omitempty"`
 	End           *durationpb.Duration `protobuf:"bytes,3,opt,name=end,proto3" json:"end,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -718,7 +959,7 @@ type SpanTimestamp struct {
 
 func (x *SpanTimestamp) Reset() {
 	*x = SpanTimestamp{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[9]
+	mi := &file_rime_text_to_speech_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -730,7 +971,7 @@ func (x *SpanTimestamp) String() string {
 func (*SpanTimestamp) ProtoMessage() {}
 
 func (x *SpanTimestamp) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[9]
+	mi := &file_rime_text_to_speech_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -743,7 +984,7 @@ func (x *SpanTimestamp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanTimestamp.ProtoReflect.Descriptor instead.
 func (*SpanTimestamp) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{9}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SpanTimestamp) GetText() string {
@@ -767,10 +1008,10 @@ func (x *SpanTimestamp) GetEnd() *durationpb.Duration {
 	return nil
 }
 
-// The timestamps of one synthesis, delivered once after all audio: on gRPC
-// as `trailer.timestamps`, on WebSocket as `done.timestamps`. Absent when
-// the request did not ask for them. A non-OK status never fails the
-// synthesis that produced the audio.
+// The timestamps of one synthesis, delivered once after its audio, all of it
+// or what a stop left: on gRPC as `trailer.timestamps`, on WebSocket as
+// `done.timestamps`. Absent when the request did not ask for them. A non-OK
+// status never fails the synthesis that produced the audio.
 type Timestamps struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// How the alignment settled, with `code` a google.rpc.Code. `OK` carries
@@ -781,8 +1022,9 @@ type Timestamps struct {
 	//	RESOURCE_EXHAUSTED   the utterance exceeds what the aligner accepts,
 	//	                     or the branch lost input under load;
 	//	DEADLINE_EXCEEDED    the aligner did not answer within its budget;
-	//	UNAVAILABLE          the aligner worker is not serving;
+	//	UNAVAILABLE          the aligner did not load, or failed transiently;
 	//	UNIMPLEMENTED        this package has no aligner;
+	//	INTERNAL             the alignment hit a defect in the server;
 	//	CANCELLED            synthesis ended before alignment settled.
 	Status        *status.Status   `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	Spans         []*SpanTimestamp `protobuf:"bytes,2,rep,name=spans,proto3" json:"spans,omitempty"`
@@ -792,7 +1034,7 @@ type Timestamps struct {
 
 func (x *Timestamps) Reset() {
 	*x = Timestamps{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[10]
+	mi := &file_rime_text_to_speech_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -804,7 +1046,7 @@ func (x *Timestamps) String() string {
 func (*Timestamps) ProtoMessage() {}
 
 func (x *Timestamps) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[10]
+	mi := &file_rime_text_to_speech_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -817,7 +1059,7 @@ func (x *Timestamps) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Timestamps.ProtoReflect.Descriptor instead.
 func (*Timestamps) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{10}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Timestamps) GetStatus() *status.Status {
@@ -849,7 +1091,7 @@ type NormalizeTextRequest struct {
 
 func (x *NormalizeTextRequest) Reset() {
 	*x = NormalizeTextRequest{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[11]
+	mi := &file_rime_text_to_speech_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -861,7 +1103,7 @@ func (x *NormalizeTextRequest) String() string {
 func (*NormalizeTextRequest) ProtoMessage() {}
 
 func (x *NormalizeTextRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[11]
+	mi := &file_rime_text_to_speech_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -874,7 +1116,7 @@ func (x *NormalizeTextRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NormalizeTextRequest.ProtoReflect.Descriptor instead.
 func (*NormalizeTextRequest) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{11}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *NormalizeTextRequest) GetText() string {
@@ -913,7 +1155,7 @@ type NormalizeTextResponse struct {
 
 func (x *NormalizeTextResponse) Reset() {
 	*x = NormalizeTextResponse{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[12]
+	mi := &file_rime_text_to_speech_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -925,7 +1167,7 @@ func (x *NormalizeTextResponse) String() string {
 func (*NormalizeTextResponse) ProtoMessage() {}
 
 func (x *NormalizeTextResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[12]
+	mi := &file_rime_text_to_speech_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -938,7 +1180,7 @@ func (x *NormalizeTextResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NormalizeTextResponse.ProtoReflect.Descriptor instead.
 func (*NormalizeTextResponse) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{12}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NormalizeTextResponse) GetNormalizedText() string {
@@ -963,7 +1205,7 @@ type GetSupportedLanguagesRequest struct {
 
 func (x *GetSupportedLanguagesRequest) Reset() {
 	*x = GetSupportedLanguagesRequest{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[13]
+	mi := &file_rime_text_to_speech_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -975,7 +1217,7 @@ func (x *GetSupportedLanguagesRequest) String() string {
 func (*GetSupportedLanguagesRequest) ProtoMessage() {}
 
 func (x *GetSupportedLanguagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[13]
+	mi := &file_rime_text_to_speech_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -988,7 +1230,7 @@ func (x *GetSupportedLanguagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSupportedLanguagesRequest.ProtoReflect.Descriptor instead.
 func (*GetSupportedLanguagesRequest) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{13}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{15}
 }
 
 type GetSupportedLanguagesResponse struct {
@@ -1001,7 +1243,7 @@ type GetSupportedLanguagesResponse struct {
 
 func (x *GetSupportedLanguagesResponse) Reset() {
 	*x = GetSupportedLanguagesResponse{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[14]
+	mi := &file_rime_text_to_speech_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1013,7 +1255,7 @@ func (x *GetSupportedLanguagesResponse) String() string {
 func (*GetSupportedLanguagesResponse) ProtoMessage() {}
 
 func (x *GetSupportedLanguagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[14]
+	mi := &file_rime_text_to_speech_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1026,7 +1268,7 @@ func (x *GetSupportedLanguagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSupportedLanguagesResponse.ProtoReflect.Descriptor instead.
 func (*GetSupportedLanguagesResponse) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{14}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetSupportedLanguagesResponse) GetLanguages() []string {
@@ -1045,7 +1287,7 @@ type GetSupportedSpeakersRequest struct {
 
 func (x *GetSupportedSpeakersRequest) Reset() {
 	*x = GetSupportedSpeakersRequest{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[15]
+	mi := &file_rime_text_to_speech_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1057,7 +1299,7 @@ func (x *GetSupportedSpeakersRequest) String() string {
 func (*GetSupportedSpeakersRequest) ProtoMessage() {}
 
 func (x *GetSupportedSpeakersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[15]
+	mi := &file_rime_text_to_speech_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1070,7 +1312,7 @@ func (x *GetSupportedSpeakersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSupportedSpeakersRequest.ProtoReflect.Descriptor instead.
 func (*GetSupportedSpeakersRequest) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{15}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetSupportedSpeakersRequest) GetLanguage() string {
@@ -1082,15 +1324,19 @@ func (x *GetSupportedSpeakersRequest) GetLanguage() string {
 
 type GetSupportedSpeakersResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// List of supported speaker names for the given language.
-	Speakers      []string `protobuf:"bytes,1,rep,name=speakers,proto3" json:"speakers,omitempty"`
+	// Names of the supported speakers.
+	Speakers []string `protobuf:"bytes,1,rep,name=speakers,proto3" json:"speakers,omitempty"`
+	// One entry per name in `speakers`, in the same order.
+	Details []*SpeakerDetail `protobuf:"bytes,2,rep,name=details,proto3" json:"details,omitempty"`
+	// UUID of the speaker map snapshot this image was built with.
+	SnapshotUuid  *string `protobuf:"bytes,3,opt,name=snapshot_uuid,json=snapshotUuid,proto3,oneof" json:"snapshot_uuid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetSupportedSpeakersResponse) Reset() {
 	*x = GetSupportedSpeakersResponse{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[16]
+	mi := &file_rime_text_to_speech_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +1348,7 @@ func (x *GetSupportedSpeakersResponse) String() string {
 func (*GetSupportedSpeakersResponse) ProtoMessage() {}
 
 func (x *GetSupportedSpeakersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[16]
+	mi := &file_rime_text_to_speech_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,12 +1361,144 @@ func (x *GetSupportedSpeakersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSupportedSpeakersResponse.ProtoReflect.Descriptor instead.
 func (*GetSupportedSpeakersResponse) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{16}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetSupportedSpeakersResponse) GetSpeakers() []string {
 	if x != nil {
 		return x.Speakers
+	}
+	return nil
+}
+
+func (x *GetSupportedSpeakersResponse) GetDetails() []*SpeakerDetail {
+	if x != nil {
+		return x.Details
+	}
+	return nil
+}
+
+func (x *GetSupportedSpeakersResponse) GetSnapshotUuid() string {
+	if x != nil && x.SnapshotUuid != nil {
+		return *x.SnapshotUuid
+	}
+	return ""
+}
+
+// One speaker from the speaker map.
+type SpeakerDetail struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The name a request passes as `speaker`, e.g. "astra".
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Languages the speaker is offered in, primary first, e.g. ["en-us"].
+	Locales []string `protobuf:"bytes,2,rep,name=locales,proto3" json:"locales,omitempty"`
+	// True for a featured voice.
+	Flagship bool `protobuf:"varint,3,opt,name=flagship,proto3" json:"flagship,omitempty"`
+	// Unspecified when not recorded.
+	Gender SpeakerGender `protobuf:"varint,4,opt,name=gender,proto3,enum=rime.SpeakerGender" json:"gender,omitempty"`
+	// Unspecified when not recorded.
+	Age SpeakerAge `protobuf:"varint,5,opt,name=age,proto3,enum=rime.SpeakerAge" json:"age,omitempty"`
+	// Regional or social variety, e.g. "Californian".
+	Accent *string `protobuf:"bytes,6,opt,name=accent,proto3,oneof" json:"accent,omitempty"`
+	// The speaker's self-described background.
+	Demographic *string `protobuf:"bytes,7,opt,name=demographic,proto3,oneof" json:"demographic,omitempty"`
+	// One sentence describing the voice.
+	Description *string `protobuf:"bytes,8,opt,name=description,proto3,oneof" json:"description,omitempty"`
+	// Style words, e.g. ["formal", "most energetic"].
+	Styles        []string `protobuf:"bytes,9,rep,name=styles,proto3" json:"styles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SpeakerDetail) Reset() {
+	*x = SpeakerDetail{}
+	mi := &file_rime_text_to_speech_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SpeakerDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SpeakerDetail) ProtoMessage() {}
+
+func (x *SpeakerDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_rime_text_to_speech_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SpeakerDetail.ProtoReflect.Descriptor instead.
+func (*SpeakerDetail) Descriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SpeakerDetail) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SpeakerDetail) GetLocales() []string {
+	if x != nil {
+		return x.Locales
+	}
+	return nil
+}
+
+func (x *SpeakerDetail) GetFlagship() bool {
+	if x != nil {
+		return x.Flagship
+	}
+	return false
+}
+
+func (x *SpeakerDetail) GetGender() SpeakerGender {
+	if x != nil {
+		return x.Gender
+	}
+	return SpeakerGender_SPEAKER_GENDER_UNSPECIFIED
+}
+
+func (x *SpeakerDetail) GetAge() SpeakerAge {
+	if x != nil {
+		return x.Age
+	}
+	return SpeakerAge_SPEAKER_AGE_UNSPECIFIED
+}
+
+func (x *SpeakerDetail) GetAccent() string {
+	if x != nil && x.Accent != nil {
+		return *x.Accent
+	}
+	return ""
+}
+
+func (x *SpeakerDetail) GetDemographic() string {
+	if x != nil && x.Demographic != nil {
+		return *x.Demographic
+	}
+	return ""
+}
+
+func (x *SpeakerDetail) GetDescription() string {
+	if x != nil && x.Description != nil {
+		return *x.Description
+	}
+	return ""
+}
+
+func (x *SpeakerDetail) GetStyles() []string {
+	if x != nil {
+		return x.Styles
 	}
 	return nil
 }
@@ -1138,6 +1516,7 @@ type WebSocketRequest struct {
 	//	*WebSocketRequest_Start
 	//	*WebSocketRequest_Text
 	//	*WebSocketRequest_End
+	//	*WebSocketRequest_Stop
 	//	*WebSocketRequest_Cancel
 	Payload       isWebSocketRequest_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
@@ -1146,7 +1525,7 @@ type WebSocketRequest struct {
 
 func (x *WebSocketRequest) Reset() {
 	*x = WebSocketRequest{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[17]
+	mi := &file_rime_text_to_speech_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1158,7 +1537,7 @@ func (x *WebSocketRequest) String() string {
 func (*WebSocketRequest) ProtoMessage() {}
 
 func (x *WebSocketRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[17]
+	mi := &file_rime_text_to_speech_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1171,7 +1550,7 @@ func (x *WebSocketRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketRequest.ProtoReflect.Descriptor instead.
 func (*WebSocketRequest) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{17}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WebSocketRequest) GetContextId() string {
@@ -1224,6 +1603,15 @@ func (x *WebSocketRequest) GetEnd() *WebSocketEnd {
 	return nil
 }
 
+func (x *WebSocketRequest) GetStop() *WebSocketStop {
+	if x != nil {
+		if x, ok := x.Payload.(*WebSocketRequest_Stop); ok {
+			return x.Stop
+		}
+	}
+	return nil
+}
+
 func (x *WebSocketRequest) GetCancel() *WebSocketCancel {
 	if x != nil {
 		if x, ok := x.Payload.(*WebSocketRequest_Cancel); ok {
@@ -1269,6 +1657,15 @@ type WebSocketRequest_End struct {
 	End *WebSocketEnd `protobuf:"bytes,5,opt,name=end,proto3,oneof"`
 }
 
+type WebSocketRequest_Stop struct {
+	// Stops a streaming context's synthesis where it is, before or after
+	// `end`. The context ends with `done`, whose `timestamps` cover the audio
+	// synthesized until the stop took effect; audio arriving after `stop` is
+	// part of that. Refused with kind "invalid_input" for a one-shot context,
+	// and a no-op for an unknown or finished one.
+	Stop *WebSocketStop `protobuf:"bytes,8,opt,name=stop,proto3,oneof"`
+}
+
 type WebSocketRequest_Cancel struct {
 	// Aborts the context immediately, discarding in-flight synthesis.
 	// Acknowledged with `cancelled`; idempotent (cancelling an unknown or
@@ -1283,6 +1680,8 @@ func (*WebSocketRequest_Start) isWebSocketRequest_Payload() {}
 func (*WebSocketRequest_Text) isWebSocketRequest_Payload() {}
 
 func (*WebSocketRequest_End) isWebSocketRequest_Payload() {}
+
+func (*WebSocketRequest_Stop) isWebSocketRequest_Payload() {}
 
 func (*WebSocketRequest_Cancel) isWebSocketRequest_Payload() {}
 
@@ -1303,7 +1702,7 @@ type WebSocketConfig struct {
 
 func (x *WebSocketConfig) Reset() {
 	*x = WebSocketConfig{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[18]
+	mi := &file_rime_text_to_speech_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1315,7 +1714,7 @@ func (x *WebSocketConfig) String() string {
 func (*WebSocketConfig) ProtoMessage() {}
 
 func (x *WebSocketConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[18]
+	mi := &file_rime_text_to_speech_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1328,7 +1727,7 @@ func (x *WebSocketConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketConfig.ProtoReflect.Descriptor instead.
 func (*WebSocketConfig) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{18}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *WebSocketConfig) GetAuthorization() string {
@@ -1360,7 +1759,7 @@ type WebSocketEnd struct {
 
 func (x *WebSocketEnd) Reset() {
 	*x = WebSocketEnd{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[19]
+	mi := &file_rime_text_to_speech_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1372,7 +1771,7 @@ func (x *WebSocketEnd) String() string {
 func (*WebSocketEnd) ProtoMessage() {}
 
 func (x *WebSocketEnd) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[19]
+	mi := &file_rime_text_to_speech_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1385,7 +1784,44 @@ func (x *WebSocketEnd) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketEnd.ProtoReflect.Descriptor instead.
 func (*WebSocketEnd) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{19}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{22}
+}
+
+// The `stop` of a streaming context.
+type WebSocketStop struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WebSocketStop) Reset() {
+	*x = WebSocketStop{}
+	mi := &file_rime_text_to_speech_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WebSocketStop) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WebSocketStop) ProtoMessage() {}
+
+func (x *WebSocketStop) ProtoReflect() protoreflect.Message {
+	mi := &file_rime_text_to_speech_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WebSocketStop.ProtoReflect.Descriptor instead.
+func (*WebSocketStop) Descriptor() ([]byte, []int) {
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{23}
 }
 
 type WebSocketCancel struct {
@@ -1396,7 +1832,7 @@ type WebSocketCancel struct {
 
 func (x *WebSocketCancel) Reset() {
 	*x = WebSocketCancel{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[20]
+	mi := &file_rime_text_to_speech_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1408,7 +1844,7 @@ func (x *WebSocketCancel) String() string {
 func (*WebSocketCancel) ProtoMessage() {}
 
 func (x *WebSocketCancel) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[20]
+	mi := &file_rime_text_to_speech_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1421,7 +1857,7 @@ func (x *WebSocketCancel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketCancel.ProtoReflect.Descriptor instead.
 func (*WebSocketCancel) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{20}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{24}
 }
 
 // Server -> client. Exactly one message per WebSocket frame.
@@ -1445,7 +1881,7 @@ type WebSocketResponse struct {
 
 func (x *WebSocketResponse) Reset() {
 	*x = WebSocketResponse{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[21]
+	mi := &file_rime_text_to_speech_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1457,7 +1893,7 @@ func (x *WebSocketResponse) String() string {
 func (*WebSocketResponse) ProtoMessage() {}
 
 func (x *WebSocketResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[21]
+	mi := &file_rime_text_to_speech_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1470,7 +1906,7 @@ func (x *WebSocketResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketResponse.ProtoReflect.Descriptor instead.
 func (*WebSocketResponse) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{21}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *WebSocketResponse) GetContextId() string {
@@ -1562,7 +1998,8 @@ type WebSocketResponse_Audio struct {
 }
 
 type WebSocketResponse_Done struct {
-	// Terminal: all audio for the context has been delivered.
+	// Terminal: all audio for the context has been delivered, or after `stop`
+	// the audio made until the stop.
 	Done *WebSocketDone `protobuf:"bytes,5,opt,name=done,proto3,oneof"`
 }
 
@@ -1604,7 +2041,7 @@ type WebSocketReady struct {
 
 func (x *WebSocketReady) Reset() {
 	*x = WebSocketReady{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[22]
+	mi := &file_rime_text_to_speech_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1616,7 +2053,7 @@ func (x *WebSocketReady) String() string {
 func (*WebSocketReady) ProtoMessage() {}
 
 func (x *WebSocketReady) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[22]
+	mi := &file_rime_text_to_speech_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1629,7 +2066,7 @@ func (x *WebSocketReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketReady.ProtoReflect.Descriptor instead.
 func (*WebSocketReady) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{22}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WebSocketReady) GetProtocol() uint32 {
@@ -1664,7 +2101,7 @@ type WebSocketStarted struct {
 
 func (x *WebSocketStarted) Reset() {
 	*x = WebSocketStarted{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[23]
+	mi := &file_rime_text_to_speech_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1676,7 +2113,7 @@ func (x *WebSocketStarted) String() string {
 func (*WebSocketStarted) ProtoMessage() {}
 
 func (x *WebSocketStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[23]
+	mi := &file_rime_text_to_speech_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1689,7 +2126,7 @@ func (x *WebSocketStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketStarted.ProtoReflect.Descriptor instead.
 func (*WebSocketStarted) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{23}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *WebSocketStarted) GetRequestId() string {
@@ -1701,7 +2138,10 @@ func (x *WebSocketStarted) GetRequestId() string {
 
 type WebSocketDone struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Present when `start.timestamps.enable` was set.
+	// Present when `start.timestamps.enable` was set. After `stop`, the
+	// timestamps of the audio synthesized until the stop took effect: that
+	// audio can run past what the client played, and spans near its end can
+	// name words that were not spoken.
 	Timestamps    *Timestamps `protobuf:"bytes,1,opt,name=timestamps,proto3,oneof" json:"timestamps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1709,7 +2149,7 @@ type WebSocketDone struct {
 
 func (x *WebSocketDone) Reset() {
 	*x = WebSocketDone{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[24]
+	mi := &file_rime_text_to_speech_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1721,7 +2161,7 @@ func (x *WebSocketDone) String() string {
 func (*WebSocketDone) ProtoMessage() {}
 
 func (x *WebSocketDone) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[24]
+	mi := &file_rime_text_to_speech_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1734,7 +2174,7 @@ func (x *WebSocketDone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketDone.ProtoReflect.Descriptor instead.
 func (*WebSocketDone) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{24}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *WebSocketDone) GetTimestamps() *Timestamps {
@@ -1752,7 +2192,7 @@ type WebSocketCancelled struct {
 
 func (x *WebSocketCancelled) Reset() {
 	*x = WebSocketCancelled{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[25]
+	mi := &file_rime_text_to_speech_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1764,7 +2204,7 @@ func (x *WebSocketCancelled) String() string {
 func (*WebSocketCancelled) ProtoMessage() {}
 
 func (x *WebSocketCancelled) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[25]
+	mi := &file_rime_text_to_speech_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1777,7 +2217,7 @@ func (x *WebSocketCancelled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketCancelled.ProtoReflect.Descriptor instead.
 func (*WebSocketCancelled) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{25}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{29}
 }
 
 type WebSocketError struct {
@@ -1796,7 +2236,7 @@ type WebSocketError struct {
 
 func (x *WebSocketError) Reset() {
 	*x = WebSocketError{}
-	mi := &file_rime_text_to_speech_proto_msgTypes[26]
+	mi := &file_rime_text_to_speech_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1808,7 +2248,7 @@ func (x *WebSocketError) String() string {
 func (*WebSocketError) ProtoMessage() {}
 
 func (x *WebSocketError) ProtoReflect() protoreflect.Message {
-	mi := &file_rime_text_to_speech_proto_msgTypes[26]
+	mi := &file_rime_text_to_speech_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1821,7 +2261,7 @@ func (x *WebSocketError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebSocketError.ProtoReflect.Descriptor instead.
 func (*WebSocketError) Descriptor() ([]byte, []int) {
-	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{26}
+	return file_rime_text_to_speech_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *WebSocketError) GetKind() string {
@@ -1849,12 +2289,16 @@ var File_rime_text_to_speech_proto protoreflect.FileDescriptor
 
 const file_rime_text_to_speech_proto_rawDesc = "" +
 	"\n" +
-	"\x19rime/text_to_speech.proto\x12\x04rime\x1a\x1egoogle/protobuf/duration.proto\x1a\x17google/rpc/status.proto\"\x86\x01\n" +
+	"\x19rime/text_to_speech.proto\x12\x04rime\x1a\x1egoogle/protobuf/duration.proto\x1a\x17google/rpc/status.proto\"\xeb\x01\n" +
 	"\x19StreamingSynthesisRequest\x120\n" +
 	"\x06header\x18\x01 \x01(\v2\x16.rime.SynthesisRequestH\x00R\x06header\x12\x1f\n" +
 	"\n" +
-	"text_chunk\x18\x02 \x01(\tH\x00R\ttextChunkB\t\n" +
-	"\apayloadJ\x04\b\x03\x10\x04R\x05flush\"\x8b\x05\n" +
+	"text_chunk\x18\x02 \x01(\tH\x00R\ttextChunk\x12/\n" +
+	"\x03end\x18\x04 \x01(\v2\x1b.rime.StreamingSynthesisEndH\x00R\x03end\x122\n" +
+	"\x04stop\x18\x05 \x01(\v2\x1c.rime.StreamingSynthesisStopH\x00R\x04stopB\t\n" +
+	"\apayloadJ\x04\b\x03\x10\x04R\x05flush\"\x17\n" +
+	"\x15StreamingSynthesisEnd\"\x18\n" +
+	"\x16StreamingSynthesisStop\"\x8b\x05\n" +
 	"\x10SynthesisRequest\x12\x1f\n" +
 	"\blanguage\x18\x02 \x01(\tH\x00R\blanguage\x88\x01\x01\x12\x1d\n" +
 	"\aspeaker\x18\x03 \x01(\tH\x01R\aspeaker\x88\x01\x01\x12\x12\n" +
@@ -1932,16 +2376,33 @@ const file_rime_text_to_speech_proto_rawDesc = "" +
 	"\tlanguages\x18\x01 \x03(\tR\tlanguages\"K\n" +
 	"\x1bGetSupportedSpeakersRequest\x12\x1f\n" +
 	"\blanguage\x18\x01 \x01(\tH\x00R\blanguage\x88\x01\x01B\v\n" +
-	"\t_language\":\n" +
+	"\t_language\"\xa5\x01\n" +
 	"\x1cGetSupportedSpeakersResponse\x12\x1a\n" +
-	"\bspeakers\x18\x01 \x03(\tR\bspeakers\"\x99\x02\n" +
+	"\bspeakers\x18\x01 \x03(\tR\bspeakers\x12-\n" +
+	"\adetails\x18\x02 \x03(\v2\x13.rime.SpeakerDetailR\adetails\x12(\n" +
+	"\rsnapshot_uuid\x18\x03 \x01(\tH\x00R\fsnapshotUuid\x88\x01\x01B\x10\n" +
+	"\x0e_snapshot_uuid\"\xd8\x02\n" +
+	"\rSpeakerDetail\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\alocales\x18\x02 \x03(\tR\alocales\x12\x1a\n" +
+	"\bflagship\x18\x03 \x01(\bR\bflagship\x12+\n" +
+	"\x06gender\x18\x04 \x01(\x0e2\x13.rime.SpeakerGenderR\x06gender\x12\"\n" +
+	"\x03age\x18\x05 \x01(\x0e2\x10.rime.SpeakerAgeR\x03age\x12\x1b\n" +
+	"\x06accent\x18\x06 \x01(\tH\x00R\x06accent\x88\x01\x01\x12%\n" +
+	"\vdemographic\x18\a \x01(\tH\x01R\vdemographic\x88\x01\x01\x12%\n" +
+	"\vdescription\x18\b \x01(\tH\x02R\vdescription\x88\x01\x01\x12\x16\n" +
+	"\x06styles\x18\t \x03(\tR\x06stylesB\t\n" +
+	"\a_accentB\x0e\n" +
+	"\f_demographicB\x0e\n" +
+	"\f_description\"\xc4\x02\n" +
 	"\x10WebSocketRequest\x12\x1d\n" +
 	"\n" +
 	"context_id\x18\x01 \x01(\tR\tcontextId\x12/\n" +
 	"\x06config\x18\x02 \x01(\v2\x15.rime.WebSocketConfigH\x00R\x06config\x12.\n" +
 	"\x05start\x18\x03 \x01(\v2\x16.rime.SynthesisRequestH\x00R\x05start\x12\x14\n" +
 	"\x04text\x18\x04 \x01(\tH\x00R\x04text\x12&\n" +
-	"\x03end\x18\x05 \x01(\v2\x12.rime.WebSocketEndH\x00R\x03end\x12/\n" +
+	"\x03end\x18\x05 \x01(\v2\x12.rime.WebSocketEndH\x00R\x03end\x12)\n" +
+	"\x04stop\x18\b \x01(\v2\x13.rime.WebSocketStopH\x00R\x04stop\x12/\n" +
 	"\x06cancel\x18\x06 \x01(\v2\x15.rime.WebSocketCancelH\x00R\x06cancelB\t\n" +
 	"\apayloadJ\x04\b\a\x10\bR\x05flush\"\xbf\x01\n" +
 	"\x0fWebSocketConfig\x12)\n" +
@@ -1952,7 +2413,8 @@ const file_rime_text_to_speech_proto_rawDesc = "" +
 	"\n" +
 	"\b_licenseB\v\n" +
 	"\t_defaults\"\x0e\n" +
-	"\fWebSocketEnd\"\x11\n" +
+	"\fWebSocketEnd\"\x0f\n" +
+	"\rWebSocketStop\"\x11\n" +
 	"\x0fWebSocketCancel\"\xca\x02\n" +
 	"\x11WebSocketResponse\x12\x1d\n" +
 	"\n" +
@@ -1988,7 +2450,18 @@ const file_rime_text_to_speech_proto_rawDesc = "" +
 	"\x1aSPLIT_STRATEGY_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17SPLIT_STRATEGY_SENTENCE\x10\x01\x12\x17\n" +
 	"\x13SPLIT_STRATEGY_NONE\x10\x02\x12&\n" +
-	"\"SPLIT_STRATEGY_ACCUMULATE_SENTENCE\x10\x032\xc5\x03\n" +
+	"\"SPLIT_STRATEGY_ACCUMULATE_SENTENCE\x10\x03*\x82\x01\n" +
+	"\rSpeakerGender\x12\x1e\n" +
+	"\x1aSPEAKER_GENDER_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13SPEAKER_GENDER_MALE\x10\x01\x12\x19\n" +
+	"\x15SPEAKER_GENDER_FEMALE\x10\x02\x12\x1d\n" +
+	"\x19SPEAKER_GENDER_NON_BINARY\x10\x03*t\n" +
+	"\n" +
+	"SpeakerAge\x12\x1b\n" +
+	"\x17SPEAKER_AGE_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17SPEAKER_AGE_YOUNG_ADULT\x10\x01\x12\x15\n" +
+	"\x11SPEAKER_AGE_ADULT\x10\x02\x12\x15\n" +
+	"\x11SPEAKER_AGE_ELDER\x10\x032\xc5\x03\n" +
 	"\fTextToSpeech\x12G\n" +
 	"\n" +
 	"Synthesize\x12\x16.rime.SynthesisRequest\x1a\x1d.rime.SynthesisResponseStream\"\x000\x01\x12[\n" +
@@ -2009,81 +2482,93 @@ func file_rime_text_to_speech_proto_rawDescGZIP() []byte {
 	return file_rime_text_to_speech_proto_rawDescData
 }
 
-var file_rime_text_to_speech_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_rime_text_to_speech_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_rime_text_to_speech_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_rime_text_to_speech_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_rime_text_to_speech_proto_goTypes = []any{
 	(SplitStrategy)(0),                    // 0: rime.SplitStrategy
-	(*StreamingSynthesisRequest)(nil),     // 1: rime.StreamingSynthesisRequest
-	(*SynthesisRequest)(nil),              // 2: rime.SynthesisRequest
-	(*PronunciationEntry)(nil),            // 3: rime.PronunciationEntry
-	(*SynthesisResponseStream)(nil),       // 4: rime.SynthesisResponseStream
-	(*SynthesisResponseTrailer)(nil),      // 5: rime.SynthesisResponseTrailer
-	(*AudioParameters)(nil),               // 6: rime.AudioParameters
-	(*CodaParameters)(nil),                // 7: rime.CodaParameters
-	(*MistParameters)(nil),                // 8: rime.MistParameters
-	(*TimestampOptions)(nil),              // 9: rime.TimestampOptions
-	(*SpanTimestamp)(nil),                 // 10: rime.SpanTimestamp
-	(*Timestamps)(nil),                    // 11: rime.Timestamps
-	(*NormalizeTextRequest)(nil),          // 12: rime.NormalizeTextRequest
-	(*NormalizeTextResponse)(nil),         // 13: rime.NormalizeTextResponse
-	(*GetSupportedLanguagesRequest)(nil),  // 14: rime.GetSupportedLanguagesRequest
-	(*GetSupportedLanguagesResponse)(nil), // 15: rime.GetSupportedLanguagesResponse
-	(*GetSupportedSpeakersRequest)(nil),   // 16: rime.GetSupportedSpeakersRequest
-	(*GetSupportedSpeakersResponse)(nil),  // 17: rime.GetSupportedSpeakersResponse
-	(*WebSocketRequest)(nil),              // 18: rime.WebSocketRequest
-	(*WebSocketConfig)(nil),               // 19: rime.WebSocketConfig
-	(*WebSocketEnd)(nil),                  // 20: rime.WebSocketEnd
-	(*WebSocketCancel)(nil),               // 21: rime.WebSocketCancel
-	(*WebSocketResponse)(nil),             // 22: rime.WebSocketResponse
-	(*WebSocketReady)(nil),                // 23: rime.WebSocketReady
-	(*WebSocketStarted)(nil),              // 24: rime.WebSocketStarted
-	(*WebSocketDone)(nil),                 // 25: rime.WebSocketDone
-	(*WebSocketCancelled)(nil),            // 26: rime.WebSocketCancelled
-	(*WebSocketError)(nil),                // 27: rime.WebSocketError
-	(*durationpb.Duration)(nil),           // 28: google.protobuf.Duration
-	(*status.Status)(nil),                 // 29: google.rpc.Status
+	(SpeakerGender)(0),                    // 1: rime.SpeakerGender
+	(SpeakerAge)(0),                       // 2: rime.SpeakerAge
+	(*StreamingSynthesisRequest)(nil),     // 3: rime.StreamingSynthesisRequest
+	(*StreamingSynthesisEnd)(nil),         // 4: rime.StreamingSynthesisEnd
+	(*StreamingSynthesisStop)(nil),        // 5: rime.StreamingSynthesisStop
+	(*SynthesisRequest)(nil),              // 6: rime.SynthesisRequest
+	(*PronunciationEntry)(nil),            // 7: rime.PronunciationEntry
+	(*SynthesisResponseStream)(nil),       // 8: rime.SynthesisResponseStream
+	(*SynthesisResponseTrailer)(nil),      // 9: rime.SynthesisResponseTrailer
+	(*AudioParameters)(nil),               // 10: rime.AudioParameters
+	(*CodaParameters)(nil),                // 11: rime.CodaParameters
+	(*MistParameters)(nil),                // 12: rime.MistParameters
+	(*TimestampOptions)(nil),              // 13: rime.TimestampOptions
+	(*SpanTimestamp)(nil),                 // 14: rime.SpanTimestamp
+	(*Timestamps)(nil),                    // 15: rime.Timestamps
+	(*NormalizeTextRequest)(nil),          // 16: rime.NormalizeTextRequest
+	(*NormalizeTextResponse)(nil),         // 17: rime.NormalizeTextResponse
+	(*GetSupportedLanguagesRequest)(nil),  // 18: rime.GetSupportedLanguagesRequest
+	(*GetSupportedLanguagesResponse)(nil), // 19: rime.GetSupportedLanguagesResponse
+	(*GetSupportedSpeakersRequest)(nil),   // 20: rime.GetSupportedSpeakersRequest
+	(*GetSupportedSpeakersResponse)(nil),  // 21: rime.GetSupportedSpeakersResponse
+	(*SpeakerDetail)(nil),                 // 22: rime.SpeakerDetail
+	(*WebSocketRequest)(nil),              // 23: rime.WebSocketRequest
+	(*WebSocketConfig)(nil),               // 24: rime.WebSocketConfig
+	(*WebSocketEnd)(nil),                  // 25: rime.WebSocketEnd
+	(*WebSocketStop)(nil),                 // 26: rime.WebSocketStop
+	(*WebSocketCancel)(nil),               // 27: rime.WebSocketCancel
+	(*WebSocketResponse)(nil),             // 28: rime.WebSocketResponse
+	(*WebSocketReady)(nil),                // 29: rime.WebSocketReady
+	(*WebSocketStarted)(nil),              // 30: rime.WebSocketStarted
+	(*WebSocketDone)(nil),                 // 31: rime.WebSocketDone
+	(*WebSocketCancelled)(nil),            // 32: rime.WebSocketCancelled
+	(*WebSocketError)(nil),                // 33: rime.WebSocketError
+	(*durationpb.Duration)(nil),           // 34: google.protobuf.Duration
+	(*status.Status)(nil),                 // 35: google.rpc.Status
 }
 var file_rime_text_to_speech_proto_depIdxs = []int32{
-	2,  // 0: rime.StreamingSynthesisRequest.header:type_name -> rime.SynthesisRequest
-	6,  // 1: rime.SynthesisRequest.audio_parameters:type_name -> rime.AudioParameters
-	0,  // 2: rime.SynthesisRequest.split_strategy:type_name -> rime.SplitStrategy
-	7,  // 3: rime.SynthesisRequest.coda_parameters:type_name -> rime.CodaParameters
-	8,  // 4: rime.SynthesisRequest.mist_parameters:type_name -> rime.MistParameters
-	9,  // 5: rime.SynthesisRequest.timestamps:type_name -> rime.TimestampOptions
-	3,  // 6: rime.SynthesisRequest.custom_lexicon:type_name -> rime.PronunciationEntry
-	5,  // 7: rime.SynthesisResponseStream.trailer:type_name -> rime.SynthesisResponseTrailer
-	11, // 8: rime.SynthesisResponseTrailer.timestamps:type_name -> rime.Timestamps
-	28, // 9: rime.SpanTimestamp.start:type_name -> google.protobuf.Duration
-	28, // 10: rime.SpanTimestamp.end:type_name -> google.protobuf.Duration
-	29, // 11: rime.Timestamps.status:type_name -> google.rpc.Status
-	10, // 12: rime.Timestamps.spans:type_name -> rime.SpanTimestamp
-	3,  // 13: rime.NormalizeTextRequest.custom_lexicon:type_name -> rime.PronunciationEntry
-	19, // 14: rime.WebSocketRequest.config:type_name -> rime.WebSocketConfig
-	2,  // 15: rime.WebSocketRequest.start:type_name -> rime.SynthesisRequest
-	20, // 16: rime.WebSocketRequest.end:type_name -> rime.WebSocketEnd
-	21, // 17: rime.WebSocketRequest.cancel:type_name -> rime.WebSocketCancel
-	2,  // 18: rime.WebSocketConfig.defaults:type_name -> rime.SynthesisRequest
-	23, // 19: rime.WebSocketResponse.ready:type_name -> rime.WebSocketReady
-	24, // 20: rime.WebSocketResponse.started:type_name -> rime.WebSocketStarted
-	25, // 21: rime.WebSocketResponse.done:type_name -> rime.WebSocketDone
-	26, // 22: rime.WebSocketResponse.cancelled:type_name -> rime.WebSocketCancelled
-	27, // 23: rime.WebSocketResponse.error:type_name -> rime.WebSocketError
-	11, // 24: rime.WebSocketDone.timestamps:type_name -> rime.Timestamps
-	2,  // 25: rime.TextToSpeech.Synthesize:input_type -> rime.SynthesisRequest
-	1,  // 26: rime.TextToSpeech.SynthesizeStreaming:input_type -> rime.StreamingSynthesisRequest
-	12, // 27: rime.TextToSpeech.NormalizeText:input_type -> rime.NormalizeTextRequest
-	14, // 28: rime.TextToSpeech.GetSupportedLanguages:input_type -> rime.GetSupportedLanguagesRequest
-	16, // 29: rime.TextToSpeech.GetSupportedSpeakers:input_type -> rime.GetSupportedSpeakersRequest
-	4,  // 30: rime.TextToSpeech.Synthesize:output_type -> rime.SynthesisResponseStream
-	4,  // 31: rime.TextToSpeech.SynthesizeStreaming:output_type -> rime.SynthesisResponseStream
-	13, // 32: rime.TextToSpeech.NormalizeText:output_type -> rime.NormalizeTextResponse
-	15, // 33: rime.TextToSpeech.GetSupportedLanguages:output_type -> rime.GetSupportedLanguagesResponse
-	17, // 34: rime.TextToSpeech.GetSupportedSpeakers:output_type -> rime.GetSupportedSpeakersResponse
-	30, // [30:35] is the sub-list for method output_type
-	25, // [25:30] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	6,  // 0: rime.StreamingSynthesisRequest.header:type_name -> rime.SynthesisRequest
+	4,  // 1: rime.StreamingSynthesisRequest.end:type_name -> rime.StreamingSynthesisEnd
+	5,  // 2: rime.StreamingSynthesisRequest.stop:type_name -> rime.StreamingSynthesisStop
+	10, // 3: rime.SynthesisRequest.audio_parameters:type_name -> rime.AudioParameters
+	0,  // 4: rime.SynthesisRequest.split_strategy:type_name -> rime.SplitStrategy
+	11, // 5: rime.SynthesisRequest.coda_parameters:type_name -> rime.CodaParameters
+	12, // 6: rime.SynthesisRequest.mist_parameters:type_name -> rime.MistParameters
+	13, // 7: rime.SynthesisRequest.timestamps:type_name -> rime.TimestampOptions
+	7,  // 8: rime.SynthesisRequest.custom_lexicon:type_name -> rime.PronunciationEntry
+	9,  // 9: rime.SynthesisResponseStream.trailer:type_name -> rime.SynthesisResponseTrailer
+	15, // 10: rime.SynthesisResponseTrailer.timestamps:type_name -> rime.Timestamps
+	34, // 11: rime.SpanTimestamp.start:type_name -> google.protobuf.Duration
+	34, // 12: rime.SpanTimestamp.end:type_name -> google.protobuf.Duration
+	35, // 13: rime.Timestamps.status:type_name -> google.rpc.Status
+	14, // 14: rime.Timestamps.spans:type_name -> rime.SpanTimestamp
+	7,  // 15: rime.NormalizeTextRequest.custom_lexicon:type_name -> rime.PronunciationEntry
+	22, // 16: rime.GetSupportedSpeakersResponse.details:type_name -> rime.SpeakerDetail
+	1,  // 17: rime.SpeakerDetail.gender:type_name -> rime.SpeakerGender
+	2,  // 18: rime.SpeakerDetail.age:type_name -> rime.SpeakerAge
+	24, // 19: rime.WebSocketRequest.config:type_name -> rime.WebSocketConfig
+	6,  // 20: rime.WebSocketRequest.start:type_name -> rime.SynthesisRequest
+	25, // 21: rime.WebSocketRequest.end:type_name -> rime.WebSocketEnd
+	26, // 22: rime.WebSocketRequest.stop:type_name -> rime.WebSocketStop
+	27, // 23: rime.WebSocketRequest.cancel:type_name -> rime.WebSocketCancel
+	6,  // 24: rime.WebSocketConfig.defaults:type_name -> rime.SynthesisRequest
+	29, // 25: rime.WebSocketResponse.ready:type_name -> rime.WebSocketReady
+	30, // 26: rime.WebSocketResponse.started:type_name -> rime.WebSocketStarted
+	31, // 27: rime.WebSocketResponse.done:type_name -> rime.WebSocketDone
+	32, // 28: rime.WebSocketResponse.cancelled:type_name -> rime.WebSocketCancelled
+	33, // 29: rime.WebSocketResponse.error:type_name -> rime.WebSocketError
+	15, // 30: rime.WebSocketDone.timestamps:type_name -> rime.Timestamps
+	6,  // 31: rime.TextToSpeech.Synthesize:input_type -> rime.SynthesisRequest
+	3,  // 32: rime.TextToSpeech.SynthesizeStreaming:input_type -> rime.StreamingSynthesisRequest
+	16, // 33: rime.TextToSpeech.NormalizeText:input_type -> rime.NormalizeTextRequest
+	18, // 34: rime.TextToSpeech.GetSupportedLanguages:input_type -> rime.GetSupportedLanguagesRequest
+	20, // 35: rime.TextToSpeech.GetSupportedSpeakers:input_type -> rime.GetSupportedSpeakersRequest
+	8,  // 36: rime.TextToSpeech.Synthesize:output_type -> rime.SynthesisResponseStream
+	8,  // 37: rime.TextToSpeech.SynthesizeStreaming:output_type -> rime.SynthesisResponseStream
+	17, // 38: rime.TextToSpeech.NormalizeText:output_type -> rime.NormalizeTextResponse
+	19, // 39: rime.TextToSpeech.GetSupportedLanguages:output_type -> rime.GetSupportedLanguagesResponse
+	21, // 40: rime.TextToSpeech.GetSupportedSpeakers:output_type -> rime.GetSupportedSpeakersResponse
+	36, // [36:41] is the sub-list for method output_type
+	31, // [31:36] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_rime_text_to_speech_proto_init() }
@@ -2094,27 +2579,32 @@ func file_rime_text_to_speech_proto_init() {
 	file_rime_text_to_speech_proto_msgTypes[0].OneofWrappers = []any{
 		(*StreamingSynthesisRequest_Header)(nil),
 		(*StreamingSynthesisRequest_TextChunk)(nil),
+		(*StreamingSynthesisRequest_End)(nil),
+		(*StreamingSynthesisRequest_Stop)(nil),
 	}
-	file_rime_text_to_speech_proto_msgTypes[1].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[3].OneofWrappers = []any{
+	file_rime_text_to_speech_proto_msgTypes[3].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[5].OneofWrappers = []any{
 		(*SynthesisResponseStream_Audio)(nil),
 		(*SynthesisResponseStream_Trailer)(nil),
 	}
-	file_rime_text_to_speech_proto_msgTypes[4].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[5].OneofWrappers = []any{}
 	file_rime_text_to_speech_proto_msgTypes[6].OneofWrappers = []any{}
 	file_rime_text_to_speech_proto_msgTypes[7].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[11].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[15].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[17].OneofWrappers = []any{
+	file_rime_text_to_speech_proto_msgTypes[8].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[9].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[13].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[17].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[18].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[19].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[20].OneofWrappers = []any{
 		(*WebSocketRequest_Config)(nil),
 		(*WebSocketRequest_Start)(nil),
 		(*WebSocketRequest_Text)(nil),
 		(*WebSocketRequest_End)(nil),
+		(*WebSocketRequest_Stop)(nil),
 		(*WebSocketRequest_Cancel)(nil),
 	}
-	file_rime_text_to_speech_proto_msgTypes[18].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[21].OneofWrappers = []any{
+	file_rime_text_to_speech_proto_msgTypes[21].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[25].OneofWrappers = []any{
 		(*WebSocketResponse_Ready)(nil),
 		(*WebSocketResponse_Started)(nil),
 		(*WebSocketResponse_Audio)(nil),
@@ -2122,16 +2612,16 @@ func file_rime_text_to_speech_proto_init() {
 		(*WebSocketResponse_Cancelled)(nil),
 		(*WebSocketResponse_Error)(nil),
 	}
-	file_rime_text_to_speech_proto_msgTypes[22].OneofWrappers = []any{}
-	file_rime_text_to_speech_proto_msgTypes[24].OneofWrappers = []any{}
 	file_rime_text_to_speech_proto_msgTypes[26].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[28].OneofWrappers = []any{}
+	file_rime_text_to_speech_proto_msgTypes[30].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rime_text_to_speech_proto_rawDesc), len(file_rime_text_to_speech_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   27,
+			NumEnums:      3,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

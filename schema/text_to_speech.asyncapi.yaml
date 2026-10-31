@@ -53,10 +53,15 @@ info:
 
     ### Authentication
 
-    Preferred is an `Authorization` header on the upgrade request (rejected
-    with HTTP 401 before the socket opens). Browsers cannot set WebSocket
-    headers; they send `config.authorization` (or `config.license`) as the
-    first message instead. Debug builds skip auth.
+    Endpoints that require authentication accept `Authorization: Bearer <api-key>`
+    on the upgrade request. Missing or invalid credentials return HTTP 401;
+    temporary authentication unavailability returns HTTP 503. Neither response
+    opens a connection.
+
+    Authentication applies to the entire connection. New connections
+    authenticate separately.
+
+    The optional `config` message contains synthesis defaults only.
 
 servers:
   engine:
@@ -87,8 +92,9 @@ channels:
             Authorization:
               type: string
               description: >-
-                Optional, e.g. "Api-Key <key>". Rejected with HTTP 401 before
-                the socket opens if invalid.
+                "Bearer <api-key>", required when authentication is enabled.
+                Missing or invalid credentials return HTTP 401; temporary
+                authentication unavailability returns HTTP 503 before upgrade.
             Sec-WebSocket-Protocol:
               type: string
               description: >-
@@ -108,6 +114,8 @@ channels:
         $ref: '#/components/messages/text'
       end:
         $ref: '#/components/messages/end'
+      stop:
+        $ref: '#/components/messages/stop'
       cancel:
         $ref: '#/components/messages/cancel'
       ready:
@@ -136,6 +144,7 @@ operations:
       - $ref: '#/channels/synthesis/messages/start'
       - $ref: '#/channels/synthesis/messages/text'
       - $ref: '#/channels/synthesis/messages/end'
+      - $ref: '#/channels/synthesis/messages/stop'
       - $ref: '#/channels/synthesis/messages/cancel'
   sendResponse:
     action: send
@@ -156,28 +165,16 @@ components:
       name: config
       title: Connection configuration
       summary: >-
-        At most one per connection, and only before the first `start`. Not
-        required in debug mode or when the upgrade request carried an
-        `Authorization` header.
+        Optional synthesis defaults, at most once per connection and only
+        before the first `start`.
       payload:
         type: object
         required: [config]
         properties:
           config:
             type: object
+            additionalProperties: false
             properties:
-              authorization:
-                type: string
-                description: >-
-                  Mirrors the HTTP `Authorization` header, e.g. "Api-Key
-                  <key>". Rejected if the upgrade request already carried an
-                  Authorization header.
-              license:
-                type: string
-                description: >-
-                  License JSON for on-prem deployments; mirrors the
-                  `x-rime-license` gRPC metadata / the `license` field of the
-                  HTTP API.
               defaults:
                 allOf:
                   - $ref: '#/components/schemas/synthesisRequest'
@@ -234,6 +231,24 @@ components:
           contextId:
             $ref: '#/components/schemas/contextId'
           end:
+            type: object
+
+    stop:
+      name: stop
+      title: Stop a streaming context
+      summary: >-
+        Stops a streaming context's synthesis where it is, before or after
+        `end`. The context ends with `done`, whose `timestamps` cover the audio
+        synthesized until the stop took effect; audio arriving after `stop` is
+        part of that. Refused with kind "invalid_input" for a one-shot context,
+        and a no-op for an unknown or finished one.
+      payload:
+        type: object
+        required: [stop]
+        properties:
+          contextId:
+            $ref: '#/components/schemas/contextId'
+          stop:
             type: object
 
     cancel:
@@ -321,7 +336,12 @@ components:
     done:
       name: done
       title: Context finished
-      summary: 'Terminal: all audio for the context has been delivered.'
+      summary: >-
+        Terminal: all audio for the context has been delivered, or after
+        `stop` the audio made until the stop. After `stop`, `timestamps`
+        covers the audio synthesized until the stop took effect: that audio
+        can run past what the client played, and spans near its end can name
+        words that were not spoken.
       payload:
         type: object
         required: [done]
@@ -423,9 +443,13 @@ components:
             - SPLIT_STRATEGY_UNSPECIFIED
             - SPLIT_STRATEGY_SENTENCE
             - SPLIT_STRATEGY_NONE
+            - SPLIT_STRATEGY_ACCUMULATE_SENTENCE
           description: >-
-            Controls how input text is split before synthesis. Defaults to
-            SPLIT_STRATEGY_SENTENCE when unset.
+            Controls how input text is split before synthesis (see
+            `SplitStrategy`). When unset, the voice package's default applies:
+            SPLIT_STRATEGY_SENTENCE unless the package sets another.
+            SPLIT_STRATEGY_ACCUMULATE_SENTENCE is valid only on a streaming
+            context.
         codaParameters:
           type: object
           properties:
@@ -448,8 +472,8 @@ components:
           type: object
           description: >-
             Timestamps of the spoken spans of the synthesized audio, reported
-            in `done.timestamps` after all audio. Off unless requested; never
-            delays or fails the audio.
+            in `done.timestamps` after the audio, all of it or what a `stop`
+            left. Off unless requested; never delays or fails the audio.
           properties:
             enable: {type: boolean}
 
@@ -458,11 +482,11 @@ components:
       description: >-
         How the alignment branch settled. `status` is a `google.rpc.Status`
         whose `code` is a `google.rpc.Code`; only `OK` (0) carries spans.
-        Spans are those of the text the talker spoke (the request text after
-        normalization: whitespace-separated words, or morphemes for a
-        language written without spaces); offsets are durations from the
-        start of the audio at its native rate, before `timeScaleFactor`, in
-        the proto3 JSON form ("1.500s").
+        Each span is a whitespace-separated word of the request text that
+        the voice spoke, or of its normalized text on Mist v3 voices;
+        offsets are durations from the start of the audio as delivered,
+        scaled with it by `timeScaleFactor`, in the proto3 JSON form
+        ("1.500s").
       properties:
         status:
           type: object

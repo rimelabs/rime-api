@@ -488,9 +488,21 @@ impl serde::Serialize for GetSupportedSpeakersResponse {
         if !self.speakers.is_empty() {
             len += 1;
         }
+        if !self.details.is_empty() {
+            len += 1;
+        }
+        if self.snapshot_uuid.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("rime.GetSupportedSpeakersResponse", len)?;
         if !self.speakers.is_empty() {
             struct_ser.serialize_field("speakers", &self.speakers)?;
+        }
+        if !self.details.is_empty() {
+            struct_ser.serialize_field("details", &self.details)?;
+        }
+        if let Some(v) = self.snapshot_uuid.as_ref() {
+            struct_ser.serialize_field("snapshotUuid", v)?;
         }
         struct_ser.end()
     }
@@ -503,11 +515,16 @@ impl<'de> serde::Deserialize<'de> for GetSupportedSpeakersResponse {
     {
         const FIELDS: &[&str] = &[
             "speakers",
+            "details",
+            "snapshot_uuid",
+            "snapshotUuid",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Speakers,
+            Details,
+            SnapshotUuid,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -530,6 +547,8 @@ impl<'de> serde::Deserialize<'de> for GetSupportedSpeakersResponse {
                     {
                         match value {
                             "speakers" => Ok(GeneratedField::Speakers),
+                            "details" => Ok(GeneratedField::Details),
+                            "snapshotUuid" | "snapshot_uuid" => Ok(GeneratedField::SnapshotUuid),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -550,6 +569,8 @@ impl<'de> serde::Deserialize<'de> for GetSupportedSpeakersResponse {
                     V: serde::de::MapAccess<'de>,
             {
                 let mut speakers__ = None;
+                let mut details__ = None;
+                let mut snapshot_uuid__ = None;
                 while let Some(k) = map_.next_key()? {
                     match k {
                         GeneratedField::Speakers => {
@@ -558,10 +579,24 @@ impl<'de> serde::Deserialize<'de> for GetSupportedSpeakersResponse {
                             }
                             speakers__ = Some(map_.next_value()?);
                         }
+                        GeneratedField::Details => {
+                            if details__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("details"));
+                            }
+                            details__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::SnapshotUuid => {
+                            if snapshot_uuid__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("snapshotUuid"));
+                            }
+                            snapshot_uuid__ = map_.next_value()?;
+                        }
                     }
                 }
                 Ok(GetSupportedSpeakersResponse {
                     speakers: speakers__.unwrap_or_default(),
+                    details: details__.unwrap_or_default(),
+                    snapshot_uuid: snapshot_uuid__,
                 })
             }
         }
@@ -1368,6 +1403,391 @@ impl<'de> serde::Deserialize<'de> for SpanTimestamp {
             }
         }
         deserializer.deserialize_struct("rime.SpanTimestamp", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SpeakerAge {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "SPEAKER_AGE_UNSPECIFIED",
+            Self::YoungAdult => "SPEAKER_AGE_YOUNG_ADULT",
+            Self::Adult => "SPEAKER_AGE_ADULT",
+            Self::Elder => "SPEAKER_AGE_ELDER",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for SpeakerAge {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "SPEAKER_AGE_UNSPECIFIED",
+            "SPEAKER_AGE_YOUNG_ADULT",
+            "SPEAKER_AGE_ADULT",
+            "SPEAKER_AGE_ELDER",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SpeakerAge;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "SPEAKER_AGE_UNSPECIFIED" => Ok(SpeakerAge::Unspecified),
+                    "SPEAKER_AGE_YOUNG_ADULT" => Ok(SpeakerAge::YoungAdult),
+                    "SPEAKER_AGE_ADULT" => Ok(SpeakerAge::Adult),
+                    "SPEAKER_AGE_ELDER" => Ok(SpeakerAge::Elder),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SpeakerDetail {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.name.is_empty() {
+            len += 1;
+        }
+        if !self.locales.is_empty() {
+            len += 1;
+        }
+        if self.flagship {
+            len += 1;
+        }
+        if self.gender != 0 {
+            len += 1;
+        }
+        if self.age != 0 {
+            len += 1;
+        }
+        if self.accent.is_some() {
+            len += 1;
+        }
+        if self.demographic.is_some() {
+            len += 1;
+        }
+        if self.description.is_some() {
+            len += 1;
+        }
+        if !self.styles.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("rime.SpeakerDetail", len)?;
+        if !self.name.is_empty() {
+            struct_ser.serialize_field("name", &self.name)?;
+        }
+        if !self.locales.is_empty() {
+            struct_ser.serialize_field("locales", &self.locales)?;
+        }
+        if self.flagship {
+            struct_ser.serialize_field("flagship", &self.flagship)?;
+        }
+        if self.gender != 0 {
+            let v = SpeakerGender::try_from(self.gender)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.gender)))?;
+            struct_ser.serialize_field("gender", &v)?;
+        }
+        if self.age != 0 {
+            let v = SpeakerAge::try_from(self.age)
+                .map_err(|_| serde::ser::Error::custom(format!("Invalid variant {}", self.age)))?;
+            struct_ser.serialize_field("age", &v)?;
+        }
+        if let Some(v) = self.accent.as_ref() {
+            struct_ser.serialize_field("accent", v)?;
+        }
+        if let Some(v) = self.demographic.as_ref() {
+            struct_ser.serialize_field("demographic", v)?;
+        }
+        if let Some(v) = self.description.as_ref() {
+            struct_ser.serialize_field("description", v)?;
+        }
+        if !self.styles.is_empty() {
+            struct_ser.serialize_field("styles", &self.styles)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for SpeakerDetail {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "name",
+            "locales",
+            "flagship",
+            "gender",
+            "age",
+            "accent",
+            "demographic",
+            "description",
+            "styles",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Name,
+            Locales,
+            Flagship,
+            Gender,
+            Age,
+            Accent,
+            Demographic,
+            Description,
+            Styles,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "name" => Ok(GeneratedField::Name),
+                            "locales" => Ok(GeneratedField::Locales),
+                            "flagship" => Ok(GeneratedField::Flagship),
+                            "gender" => Ok(GeneratedField::Gender),
+                            "age" => Ok(GeneratedField::Age),
+                            "accent" => Ok(GeneratedField::Accent),
+                            "demographic" => Ok(GeneratedField::Demographic),
+                            "description" => Ok(GeneratedField::Description),
+                            "styles" => Ok(GeneratedField::Styles),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SpeakerDetail;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct rime.SpeakerDetail")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<SpeakerDetail, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut name__ = None;
+                let mut locales__ = None;
+                let mut flagship__ = None;
+                let mut gender__ = None;
+                let mut age__ = None;
+                let mut accent__ = None;
+                let mut demographic__ = None;
+                let mut description__ = None;
+                let mut styles__ = None;
+                while let Some(k) = map_.next_key()? {
+                    match k {
+                        GeneratedField::Name => {
+                            if name__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Locales => {
+                            if locales__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("locales"));
+                            }
+                            locales__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Flagship => {
+                            if flagship__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("flagship"));
+                            }
+                            flagship__ = Some(map_.next_value()?);
+                        }
+                        GeneratedField::Gender => {
+                            if gender__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("gender"));
+                            }
+                            gender__ = Some(map_.next_value::<SpeakerGender>()? as i32);
+                        }
+                        GeneratedField::Age => {
+                            if age__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("age"));
+                            }
+                            age__ = Some(map_.next_value::<SpeakerAge>()? as i32);
+                        }
+                        GeneratedField::Accent => {
+                            if accent__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("accent"));
+                            }
+                            accent__ = map_.next_value()?;
+                        }
+                        GeneratedField::Demographic => {
+                            if demographic__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("demographic"));
+                            }
+                            demographic__ = map_.next_value()?;
+                        }
+                        GeneratedField::Description => {
+                            if description__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("description"));
+                            }
+                            description__ = map_.next_value()?;
+                        }
+                        GeneratedField::Styles => {
+                            if styles__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("styles"));
+                            }
+                            styles__ = Some(map_.next_value()?);
+                        }
+                    }
+                }
+                Ok(SpeakerDetail {
+                    name: name__.unwrap_or_default(),
+                    locales: locales__.unwrap_or_default(),
+                    flagship: flagship__.unwrap_or_default(),
+                    gender: gender__.unwrap_or_default(),
+                    age: age__.unwrap_or_default(),
+                    accent: accent__,
+                    demographic: demographic__,
+                    description: description__,
+                    styles: styles__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("rime.SpeakerDetail", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for SpeakerGender {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::Unspecified => "SPEAKER_GENDER_UNSPECIFIED",
+            Self::Male => "SPEAKER_GENDER_MALE",
+            Self::Female => "SPEAKER_GENDER_FEMALE",
+            Self::NonBinary => "SPEAKER_GENDER_NON_BINARY",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for SpeakerGender {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "SPEAKER_GENDER_UNSPECIFIED",
+            "SPEAKER_GENDER_MALE",
+            "SPEAKER_GENDER_FEMALE",
+            "SPEAKER_GENDER_NON_BINARY",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = SpeakerGender;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                i32::try_from(v)
+                    .ok()
+                    .and_then(|x| x.try_into().ok())
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "SPEAKER_GENDER_UNSPECIFIED" => Ok(SpeakerGender::Unspecified),
+                    "SPEAKER_GENDER_MALE" => Ok(SpeakerGender::Male),
+                    "SPEAKER_GENDER_FEMALE" => Ok(SpeakerGender::Female),
+                    "SPEAKER_GENDER_NON_BINARY" => Ok(SpeakerGender::NonBinary),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
     }
 }
 impl serde::Serialize for SpeechWebSocketCancel {
@@ -2525,6 +2945,77 @@ impl<'de> serde::Deserialize<'de> for StreamingOutputContract {
         deserializer.deserialize_any(GeneratedVisitor)
     }
 }
+impl serde::Serialize for StreamingSynthesisEnd {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("rime.StreamingSynthesisEnd", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for StreamingSynthesisEnd {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = StreamingSynthesisEnd;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct rime.StreamingSynthesisEnd")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<StreamingSynthesisEnd, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map_.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(StreamingSynthesisEnd {
+                })
+            }
+        }
+        deserializer.deserialize_struct("rime.StreamingSynthesisEnd", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for StreamingSynthesisRequest {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -2545,6 +3036,12 @@ impl serde::Serialize for StreamingSynthesisRequest {
                 streaming_synthesis_request::Payload::TextChunk(v) => {
                     struct_ser.serialize_field("textChunk", v)?;
                 }
+                streaming_synthesis_request::Payload::End(v) => {
+                    struct_ser.serialize_field("end", v)?;
+                }
+                streaming_synthesis_request::Payload::Stop(v) => {
+                    struct_ser.serialize_field("stop", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -2560,12 +3057,16 @@ impl<'de> serde::Deserialize<'de> for StreamingSynthesisRequest {
             "header",
             "text_chunk",
             "textChunk",
+            "end",
+            "stop",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Header,
             TextChunk,
+            End,
+            Stop,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2589,6 +3090,8 @@ impl<'de> serde::Deserialize<'de> for StreamingSynthesisRequest {
                         match value {
                             "header" => Ok(GeneratedField::Header),
                             "textChunk" | "text_chunk" => Ok(GeneratedField::TextChunk),
+                            "end" => Ok(GeneratedField::End),
+                            "stop" => Ok(GeneratedField::Stop),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2624,6 +3127,20 @@ impl<'de> serde::Deserialize<'de> for StreamingSynthesisRequest {
                             }
                             payload__ = map_.next_value::<::std::option::Option<_>>()?.map(streaming_synthesis_request::Payload::TextChunk);
                         }
+                        GeneratedField::End => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("end"));
+                            }
+                            payload__ = map_.next_value::<::std::option::Option<_>>()?.map(streaming_synthesis_request::Payload::End)
+;
+                        }
+                        GeneratedField::Stop => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stop"));
+                            }
+                            payload__ = map_.next_value::<::std::option::Option<_>>()?.map(streaming_synthesis_request::Payload::Stop)
+;
+                        }
                     }
                 }
                 Ok(StreamingSynthesisRequest {
@@ -2632,6 +3149,77 @@ impl<'de> serde::Deserialize<'de> for StreamingSynthesisRequest {
             }
         }
         deserializer.deserialize_struct("rime.StreamingSynthesisRequest", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for StreamingSynthesisStop {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("rime.StreamingSynthesisStop", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for StreamingSynthesisStop {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = StreamingSynthesisStop;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct rime.StreamingSynthesisStop")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<StreamingSynthesisStop, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map_.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(StreamingSynthesisStop {
+                })
+            }
+        }
+        deserializer.deserialize_struct("rime.StreamingSynthesisStop", FIELDS, GeneratedVisitor)
     }
 }
 impl serde::Serialize for StreamingTranscriptionRequest {
@@ -4982,6 +5570,9 @@ impl serde::Serialize for WebSocketRequest {
                 web_socket_request::Payload::End(v) => {
                     struct_ser.serialize_field("end", v)?;
                 }
+                web_socket_request::Payload::Stop(v) => {
+                    struct_ser.serialize_field("stop", v)?;
+                }
                 web_socket_request::Payload::Cancel(v) => {
                     struct_ser.serialize_field("cancel", v)?;
                 }
@@ -5003,6 +5594,7 @@ impl<'de> serde::Deserialize<'de> for WebSocketRequest {
             "start",
             "text",
             "end",
+            "stop",
             "cancel",
         ];
 
@@ -5013,6 +5605,7 @@ impl<'de> serde::Deserialize<'de> for WebSocketRequest {
             Start,
             Text,
             End,
+            Stop,
             Cancel,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -5040,6 +5633,7 @@ impl<'de> serde::Deserialize<'de> for WebSocketRequest {
                             "start" => Ok(GeneratedField::Start),
                             "text" => Ok(GeneratedField::Text),
                             "end" => Ok(GeneratedField::End),
+                            "stop" => Ok(GeneratedField::Stop),
                             "cancel" => Ok(GeneratedField::Cancel),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -5095,6 +5689,13 @@ impl<'de> serde::Deserialize<'de> for WebSocketRequest {
                                 return Err(serde::de::Error::duplicate_field("end"));
                             }
                             payload__ = map_.next_value::<::std::option::Option<_>>()?.map(web_socket_request::Payload::End)
+;
+                        }
+                        GeneratedField::Stop => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("stop"));
+                            }
+                            payload__ = map_.next_value::<::std::option::Option<_>>()?.map(web_socket_request::Payload::Stop)
 ;
                         }
                         GeneratedField::Cancel => {
@@ -5385,5 +5986,76 @@ impl<'de> serde::Deserialize<'de> for WebSocketStarted {
             }
         }
         deserializer.deserialize_struct("rime.WebSocketStarted", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for WebSocketStop {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let len = 0;
+        let struct_ser = serializer.serialize_struct("rime.WebSocketStop", len)?;
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for WebSocketStop {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = WebSocketStop;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct rime.WebSocketStop")
+            }
+
+            fn visit_map<V>(self, mut map_: V) -> std::result::Result<WebSocketStop, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                while map_.next_key::<GeneratedField>()?.is_some() {
+                    let _ = map_.next_value::<serde::de::IgnoredAny>()?;
+                }
+                Ok(WebSocketStop {
+                })
+            }
+        }
+        deserializer.deserialize_struct("rime.WebSocketStop", FIELDS, GeneratedVisitor)
     }
 }
