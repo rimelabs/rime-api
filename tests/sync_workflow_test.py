@@ -24,12 +24,14 @@ class SyncWorkflowTest(unittest.TestCase):
         self.pull_requests.write_text("17\n")
         self.output = self.root / "output"
         self.output.touch()
+        self.pushed_commits = self.remote / "pushed-commits"
         self.environment = dict(
             os.environ,
             PATH=f"{self.commands}{os.pathsep}{os.environ['PATH']}",
             REAL_GIT=shutil.which("git"),
             PULL_REQUESTS=str(self.pull_requests),
             GITHUB_OUTPUT=str(self.output),
+            RUNNER_TEMP=str(self.root),
         )
         self.install_command(
             "gh",
@@ -49,6 +51,7 @@ class SyncWorkflowTest(unittest.TestCase):
                 [[ "$3" == "$(cat "$PULL_REQUESTS")" ]]
                 : > "$PULL_REQUESTS"
                 ;;
+              'pr create') echo '18' > "$PULL_REQUESTS" ;;
               *) exit 99 ;;
             esac
             """,
@@ -57,16 +60,31 @@ class SyncWorkflowTest(unittest.TestCase):
             "bazel",
             """
             if [[ "$*" == 'run //:update_go' ]]; then
+              if [[ "${GO_STATUS:-0}" != 0 ]]; then exit "$GO_STATUS"; fi
               mkdir -p go
               echo generated > go/definition.pb.go
               exit 0
             fi
             if [[ "$*" == 'run //:update_rust' ]]; then
+              if [[ "${RUST_STATUS:-0}" != 0 ]]; then exit "$RUST_STATUS"; fi
               mkdir -p rust/src/generated
               echo generated > rust/src/generated/rime.rs
+              if [[ -n "${CONCURRENT_COMMIT:-}" ]]; then
+                "$REAL_GIT" push --force origin "$CONCURRENT_COMMIT:refs/heads/sync/public-api"
+              fi
               exit 0
             fi
-            exit "${COPYBARA_STATUS:-0}"
+            if [[ "${COPYBARA_STATUS:-0}" == 4 && -n "${CONCURRENT_COMMIT:-}" ]]; then
+              "$REAL_GIT" push --force origin "$CONCURRENT_COMMIT:refs/heads/sync/public-api"
+            fi
+            if [[ "${COPYBARA_STATUS:-0}" != 0 ]]; then exit "$COPYBARA_STATUS"; fi
+            destination=origin
+            for argument in "$@"; do
+              case "$argument" in
+                --git-destination-url=*) destination="${argument#*=}" ;;
+              esac
+            done
+            "$REAL_GIT" push --force "$destination" "$EXPORTED_COMMIT:refs/heads/sync/public-api"
             """,
         )
         self.install_command(
@@ -77,6 +95,9 @@ class SyncWorkflowTest(unittest.TestCase):
             fi
             if [[ "$1" == push && "${PUSH_STATUS:-0}" != 0 ]]; then
               exit "$PUSH_STATUS"
+            fi
+            if [[ "$1" == push && "$*" == *'--delete sync/public-api'* && -n "${CONCURRENT_DELETE_COMMIT:-}" ]]; then
+              "$REAL_GIT" push --force origin "$CONCURRENT_DELETE_COMMIT:refs/heads/sync/public-api"
             fi
             exec "$REAL_GIT" "$@"
             """,
@@ -95,7 +116,29 @@ class SyncWorkflowTest(unittest.TestCase):
         self.git("push", "origin", "main")
         self.schema.write_text("pending change\n")
         self.git("commit", "-am", "Pending export\n\nGitOrigin-RevId: " + "b" * 40)
+        self.environment["EXPORTED_COMMIT"] = self.git("rev-parse", "HEAD").strip()
+        self.git("branch", "export-fixture")
+        self.schema.write_text("previous pending change\n")
+        (self.repository / "sync/SOURCE_REVISION").write_text("c" * 40 + "\n")
+        (self.repository / "go").mkdir()
+        (self.repository / "go/definition.pb.go").write_text("previous\n")
+        (self.repository / "rust/src/generated").mkdir(parents=True)
+        (self.repository / "rust/src/generated/rime.rs").write_text("previous\n")
+        self.git("add", ".")
+        self.git("commit", "--amend", "-m", "Previous complete export")
         self.git("push", "origin", "HEAD:sync/public-api")
+        self.git("reset", "--hard", "origin/main")
+        # Record every commit published to the PR branch, including intermediate pushes.
+        hook = self.remote / "hooks/post-receive"
+        hook.write_text(
+            "#!/usr/bin/env bash\n"
+            "while read -r previous current reference; do\n"
+            '  if [[ "$reference" == refs/heads/sync/public-api ]]; then\n'
+            '    echo "$current" >> pushed-commits\n'
+            "  fi\n"
+            "done\n"
+        )
+        hook.chmod(0o755)
 
     def install_command(self, name, script):
         path = self.commands / name
@@ -133,13 +176,21 @@ class SyncWorkflowTest(unittest.TestCase):
         result = self.run_step("Export schemas with Copybara")
         if result.returncode:
             return result
-        exported_status = self.output.read_text().strip().removeprefix("status=")
+        outputs = dict(
+            line.split("=", 1) for line in self.output.read_text().splitlines()
+        )
         for name in ("Close the stale schema PR", "Open or retain the schema PR"):
             condition = re.search(
                 r"if: steps\.export\.outputs\.status == '(\d+)'", steps[name]
             )
             self.assertIsNotNone(condition)
-            if exported_status == condition[1]:
+            if outputs["status"] == condition[1]:
+                for variable, output in re.findall(
+                    r"^          (\w+): \$\{\{ steps\.export\.outputs\.(\w+) \}\}$",
+                    steps[name],
+                    re.M,
+                ):
+                    self.environment[variable] = outputs[output]
                 result = self.run_step(name)
                 if result.returncode:
                     return result
@@ -171,6 +222,97 @@ class SyncWorkflowTest(unittest.TestCase):
             "b" * 40,
         )
 
+    def test_only_complete_commit_is_pushed(self):
+        result = self.run_sync_steps(0)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        published = self.pushed_commits.read_text().splitlines()
+        self.assertEqual(len(published), 1, result.stdout)
+        for path, expected in (
+            ("schema/definition", "pending change"),
+            ("sync/SOURCE_REVISION", "b" * 40),
+            ("go/definition.pb.go", "generated"),
+            ("rust/src/generated/rime.rs", "generated"),
+        ):
+            self.assertEqual(
+                self.git("show", f"{published[0]}:{path}").strip(), expected
+            )
+
+    def test_generation_failure_does_not_publish(self):
+        for variable in ("GO_STATUS", "RUST_STATUS"):
+            with self.subTest(command=variable):
+                self.environment[variable] = "1"
+                result = self.run_sync_steps(0)
+                del self.environment[variable]
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertFalse(self.pushed_commits.exists(), result.stdout)
+                self.assertEqual(self.pull_requests.read_text(), "17\n")
+                self.git("reset", "--hard", "origin/main")
+                self.git("clean", "-fd")
+
+    def test_first_export_creates_branch_and_pr(self):
+        self.git("push", "origin", "--delete", "sync/public-api")
+        self.pushed_commits.unlink()
+        self.pull_requests.write_text("")
+        result = self.run_sync_steps(0)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.pull_requests.read_text(), "18\n")
+        self.assertTrue(self.branch_exists())
+        self.assertEqual(len(self.pushed_commits.read_text().splitlines()), 1)
+
+    def test_concurrent_branch_update_is_preserved(self):
+        self.git("switch", "export-fixture")
+        self.schema.write_text("concurrent update\n")
+        self.git("commit", "-am", "Concurrent update")
+        concurrent_commit = self.git("rev-parse", "HEAD").strip()
+        self.git("switch", "main")
+        self.environment["CONCURRENT_COMMIT"] = concurrent_commit
+        result = self.run_sync_steps(0)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        remote_commit = self.git(
+            "ls-remote", "--heads", "origin", "refs/heads/sync/public-api"
+        ).split()[0]
+        self.assertEqual(remote_commit, concurrent_commit)
+
+    def test_publish_failure_preserves_pr_and_branch(self):
+        self.environment["PUSH_STATUS"] = "1"
+        result = self.run_sync_steps(0)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertFalse(self.pushed_commits.exists(), result.stdout)
+        self.assertEqual(self.pull_requests.read_text(), "17\n")
+
+    def test_stale_cleanup_preserves_concurrent_branch_update(self):
+        self.environment["CONCURRENT_COMMIT"] = self.environment["EXPORTED_COMMIT"]
+        result = self.run_sync_steps(4)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        remote_commit = self.git(
+            "ls-remote", "--heads", "origin", "refs/heads/sync/public-api"
+        ).split()[0]
+        self.assertEqual(remote_commit, self.environment["CONCURRENT_COMMIT"])
+        self.assertEqual(self.pull_requests.read_text(), "17\n")
+
+    def test_stale_cleanup_lease_preserves_update_after_branch_check(self):
+        self.environment["CONCURRENT_DELETE_COMMIT"] = self.environment[
+            "EXPORTED_COMMIT"
+        ]
+        result = self.run_sync_steps(4)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        remote_commit = self.git(
+            "ls-remote", "--heads", "origin", "refs/heads/sync/public-api"
+        ).split()[0]
+        self.assertEqual(remote_commit, self.environment["CONCURRENT_DELETE_COMMIT"])
+        self.assertEqual(self.pull_requests.read_text(), "17\n")
+
+    def test_pr_close_failure_can_be_retried_after_branch_deletion(self):
+        self.environment["PR_CLOSE_STATUS"] = "1"
+        result = self.run_sync_steps(4)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertFalse(self.branch_exists())
+        self.assertEqual(self.pull_requests.read_text(), "17\n")
+        del self.environment["PR_CLOSE_STATUS"]
+        result = self.run_sync_steps(4)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(self.pull_requests.read_text(), "")
+
     def test_copybara_failure_preserves_pr_and_branch(self):
         result = self.run_sync_steps(2)
         self.assertEqual(result.returncode, 2, result.stdout)
@@ -181,7 +323,6 @@ class SyncWorkflowTest(unittest.TestCase):
     def test_cleanup_errors_fail_the_job(self):
         for variable in (
             "PR_LIST_STATUS",
-            "PR_CLOSE_STATUS",
             "REMOTE_STATUS",
             "PUSH_STATUS",
         ):
@@ -192,8 +333,7 @@ class SyncWorkflowTest(unittest.TestCase):
                 del self.environment[variable]
                 self.assertEqual(result.returncode, 1, result.stdout)
                 self.assertTrue(self.branch_exists())
-                if variable in ("PR_LIST_STATUS", "PR_CLOSE_STATUS"):
-                    self.assertEqual(self.pull_requests.read_text(), "17\n")
+                self.assertEqual(self.pull_requests.read_text(), "17\n")
 
 
 if __name__ == "__main__":

@@ -88,7 +88,23 @@ class CopybaraTest(unittest.TestCase):
                 'syntax = "proto3";\nmessage Added {}\n'
             )
             revision = commit(origin, "Add public message")
-            run(*command)
+            # The workflow exports to a local clone before updating the public branch.
+            staged_destination = root / "staged.git"
+            run("git", "clone", "--bare", str(destination), str(staged_destination))
+            run(*command, f"--git-destination-url={staged_destination.as_uri()}")
+            self.assertEqual(
+                run(
+                    "git", "branch", "--list", "sync/public-api", directory=destination
+                ),
+                "",
+            )
+            run(
+                "git",
+                "fetch",
+                str(staged_destination),
+                "refs/heads/sync/public-api:refs/heads/sync/public-api",
+                directory=destination,
+            )
             message = run(
                 "git",
                 "log",

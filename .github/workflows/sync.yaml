@@ -33,36 +33,50 @@ jobs:
         run: |
           revision=$(cat sync/SOURCE_REVISION)
           [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid source revision.'; exit 1; }
+          remote_branch=$(git ls-remote --heads origin refs/heads/sync/public-api)
+          expected_commit=$(cut -f1 <<< "$remote_branch")
+          # Export locally so PR checks only see a complete sync commit.
+          exported_repository=$(mktemp -d "$RUNNER_TEMP/rime-api-export.XXXXXX")/repository.git
+          git clone --bare --no-hardlinks "$PWD" "$exported_repository"
           status=0
           bazel run //tools:copybara -- migrate "$PWD/copy.bara.sky" public_api \
             --git-committer-name='Rime API Sync' \
             --git-committer-email=noreply@rime.ai \
+            --git-destination-url="file://$exported_repository" \
             --git-destination-non-fast-forward --last-rev="$revision" || status=$?
           # Copybara returns 4 when the selected source files have no changes.
           if [[ "$status" != 0 && "$status" != 4 ]]; then
             exit "$status"
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "repository=$exported_repository" >> "$GITHUB_OUTPUT"
+          echo "expected_commit=$expected_commit" >> "$GITHUB_OUTPUT"
       - name: Close the stale schema PR
         if: steps.export.outputs.status == '4'
+        env:
+          EXPECTED_SYNC_COMMIT: ${{ steps.export.outputs.expected_commit }}
         run: |
           pull_requests=$(gh pr list --head sync/public-api --base main --state open --json number --jq '.[].number')
+          # An empty result means the branch is absent. Access errors must fail.
+          remote_branch=$(git ls-remote --heads origin refs/heads/sync/public-api)
+          current_commit=$(cut -f1 <<< "$remote_branch")
+          if [[ "$current_commit" != "$EXPECTED_SYNC_COMMIT" ]]; then
+            echo 'The sync branch changed during export; leave its branch and PR unchanged.'
+            exit 1
+          fi
+          if [[ -n "$current_commit" ]]; then
+            git push --force-with-lease="refs/heads/sync/public-api:$EXPECTED_SYNC_COMMIT" origin --delete sync/public-api
+          fi
           for pull_request in $pull_requests; do
             gh pr close "$pull_request"
           done
-          # An empty result means the branch is absent. Access errors must fail.
-          remote_branch=$(git ls-remote --heads origin refs/heads/sync/public-api)
-          if [[ -n "$remote_branch" ]]; then
-            git push origin --delete sync/public-api
-          fi
       - name: Open or retain the schema PR
         if: steps.export.outputs.status == '0'
+        env:
+          EXPORTED_REPOSITORY: ${{ steps.export.outputs.repository }}
+          EXPECTED_SYNC_COMMIT: ${{ steps.export.outputs.expected_commit }}
         run: |
-          if ! git ls-remote --exit-code --heads origin sync/public-api; then
-            exit 0
-          fi
-          git fetch origin sync/public-api
-          exported_commit=$(git rev-parse FETCH_HEAD)
+          git fetch "$EXPORTED_REPOSITORY" refs/heads/sync/public-api
           if git diff --quiet origin/main FETCH_HEAD -- schema; then
             exit 0
           fi
@@ -75,7 +89,7 @@ jobs:
           bazel run //:update_rust
           git add sync/SOURCE_REVISION go rust
           git -c user.name='Rime API Sync' -c user.email=noreply@rime.ai commit --amend --no-edit
-          git push --force-with-lease="refs/heads/sync/public-api:$exported_commit" origin HEAD:sync/public-api
+          git push --force-with-lease="refs/heads/sync/public-api:$EXPECTED_SYNC_COMMIT" origin HEAD:sync/public-api
           existing=$(gh pr list --head sync/public-api --base main --state open --json number --jq 'length')
           if [[ "$existing" == 0 ]]; then
             cat > /tmp/rime-api-sync-pr.md <<'BODY'
