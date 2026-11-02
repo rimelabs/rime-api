@@ -1,0 +1,32 @@
+.github/workflows/sync.yaml
+  s_ef0684f4a92cb1::t_b2fe31552b70cc 36-40,45,52-53,75-77,79,92
+  s_ef0684f4a92cb1::t_c072baa82fe7f0 56-57,62-68,70-72
+sync/README.md
+  s_ef0684f4a92cb1::t_c072baa82fe7f0 90-93
+  s_ef0684f4a92cb1::t_b2fe31552b70cc 18-24,32-34
+tests/sync_workflow_test.py
+  s_ef0684f4a92cb1::t_f89f9a3b412f81 135,179-181,236-238
+  s_ef0684f4a92cb1::t_df1a92e2cb41e7 27,34,54,63,69,72,74,80-87,119-120,130-134,136-141,187-193,225-235,239-280,291
+  s_ef0684f4a92cb1::t_2c1f328b66e3e6 73,121-128
+  s_ef0684f4a92cb1::t_df6c9f8575c7c6 77-79,281-290
+  s_ef0684f4a92cb1::t_c072baa82fe7f0 99-101,293-315,336
+  s_ef0684f4a92cb1::t_897daa8d2332a4 292
+tests/copybara_test.py
+  s_ef0684f4a92cb1::t_b2fe31552b70cc 91-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cf229b83fe6f91a4d48339d31decca9c7c371692",
+  "prompts": {},
+  "sessions": {
+    "s_ef0684f4a92cb1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19d2a-3f51-73f1-bcd5-1f08569ae86b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
