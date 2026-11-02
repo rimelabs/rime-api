@@ -679,9 +679,9 @@
           "REPO_MAPPING:rules_rust+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
           "REPO_MAPPING:rules_rust+,rules_cc rules_cc+",
-          "FILE:@@//Cargo.lock 164699f8663e125f57997ed50bcd22d3fdd571db5b9aed0d220c5bd20bf72862",
+          "FILE:@@//Cargo.lock c86d448d365e49dafd7256e3952f0b3012d3f7f25edbef494a60407bc7ddcad0",
           "FILE:@@//Cargo.toml 69a2bb73c502eac6be642f9b3435346335dac46f88986c701f0f2739f36c6239",
-          "FILE:@@//rust/Cargo.toml cc31c09805ce2c58cc4cb39568016cb127672776408a40b2cba31a528010d2ea",
+          "FILE:@@//rust/Cargo.toml 99e39f2c29a8e9f74c9c8e3a7a02dedc55f47f8178143d1da2d8774a30fa1c0b",
           "FILE:@@//tools/rust/Cargo.toml f09741f23bc50c0540da64c93cd4991a289a9c9081d9f6043d32934c48798194"
         ],
         "generatedRepoSpecs": {
