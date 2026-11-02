@@ -15,9 +15,13 @@ the internal model protocol or other files added under `interfaces`.
 Build rules, package metadata, tests, generated Go code, and release tooling belong to this
 repository and are outside Copybara's destination file list.
 
-Copybara creates a commit on `sync/public-api`. The workflow opens a PR against
-`main`. The commit uses a fixed public message and author. It does not copy
-private commit descriptions or author addresses.
+The workflow exports schemas with Copybara into a temporary local Git repository.
+It adds the source revision and generated Go and Rust files, then pushes the
+complete commit to `sync/public-api` and opens or updates a PR against `main`.
+The push uses a lease on the branch revision recorded before export. If another
+process changes that branch during generation, the push fails.
+The commit uses a fixed public message and author. It does not copy private
+commit descriptions or author addresses.
 
 ## Source revision and merge checks
 
@@ -25,8 +29,9 @@ private commit descriptions or author addresses.
 schemas. The sync job passes this revision to Copybara, keeps its last-revision
 consistency check enabled, and updates the file from the exported commit's
 `GitOrigin-RevId` trailer. The revision file survives squash merges.
-The job runs `bazel run //:update_go` and includes generated Go changes in the
-same PR. Package CI rejects a stale generated module.
+The job runs `bazel run //:update_go` and `bazel run //:update_rust` before pushing.
+If either command fails, the existing remote branch stays unchanged. Package CI
+rejects stale generated files.
 `sync/INITIAL_REVISION` is the historical bootstrap record; it no longer selects
 the current baseline.
 
@@ -82,9 +87,10 @@ publication to the release process. Merging the sync PR lets Release Please
 open or update the release PR. Merging the release PR starts publication after
 checks pass on its merged commit. Do not make manual edits on the sync branch.
 Copybara can replace it when a new source change arrives before PR merge.
-If Copybara returns exit code 4, the workflow closes the open sync PR and
-deletes the sync branch. This removes pending changes that the source has
-reverted. Repeated runs succeed when the PR and branch are already absent.
+If Copybara returns exit code 4, the workflow deletes the sync branch with a
+lease, then closes the open sync PR. If the branch changed during export,
+cleanup fails before closing the PR. This removes pending changes that the
+source has reverted. Repeated runs succeed when the PR and branch are already absent.
 Other Copybara errors stop the workflow before PR or branch cleanup.
 
 ## Local use
