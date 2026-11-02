@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/rimelabs/rime-api/compare/v0.4.1...v0.5.0) (2026-11-02)
+
+
+### Features
+
+* ship Python and Node.js gRPC clients ([#25](https://github.com/rimelabs/rime-api/issues/25)) ([a7a5d61](https://github.com/rimelabs/rime-api/commit/a7a5d612f6f3bbdaf2bdf0df25e439c4fb772866))
+
 ## [0.4.1](https://github.com/rimelabs/rime-api/compare/v0.4.0...v0.4.1) (2026-11-02)
 
 
