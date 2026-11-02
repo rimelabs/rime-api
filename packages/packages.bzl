@@ -40,6 +40,7 @@ def _api_packages_impl(ctx):
             arguments.add("--schema", source.path.removeprefix(proto.proto_source_root + "/"))
     arguments.add("--schema-workspace", ctx.file.schema_workspace.path)
     arguments.add("--plugin", ctx.executable.plugin.path)
+    arguments.add("--grpc-builder", ctx.executable.grpc_builder.path)
     arguments.add("--templates", ctx.files.templates[0].dirname)
     arguments.add("--output", output.path)
     arguments.add("--version", ctx.file.version.path)
@@ -49,7 +50,7 @@ def _api_packages_impl(ctx):
         executable = ctx.executable._builder,
         arguments = [arguments],
         inputs = depset(ctx.files.templates + ctx.files.license_files + ctx.files.asyncapis + [ctx.file.version, ctx.file.schema_workspace], transitive = [sources]),
-        tools = [ctx.attr.plugin[DefaultInfo].files_to_run],
+        tools = [ctx.attr.plugin[DefaultInfo].files_to_run, ctx.attr.grpc_builder[DefaultInfo].files_to_run],
         outputs = [output],
         env = {"SOURCE_DATE_EPOCH": "315532800", "BAZEL_BINDIR": ctx.bin_dir.path},
         mnemonic = "RimeApiPackages",
@@ -61,6 +62,7 @@ api_packages = rule(
     implementation = _api_packages_impl,
     attrs = {
         "asyncapis": attr.label_list(allow_files = True, mandatory = True),
+        "grpc_builder": attr.label(executable = True, cfg = "exec", mandatory = True),
         "license_files": attr.label_list(allow_files = True),
         "plugin": attr.label(executable = True, cfg = "exec", mandatory = True),
         "protos": attr.label_list(providers = [ProtoInfo], mandatory = True),

@@ -110,7 +110,7 @@ jobs:
           uv run --no-project --python 3.13 python tools/release.py registry \
             --registry npm --directory release-dist --download "$RUNNER_TEMP/npm-release"
       - name: Test installation from npm
-        run: bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz
+        run: bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz --allow-legacy
   pypi:
     needs: prepare
     if: needs.prepare.outputs.registry == 'pypi' || needs.prepare.outputs.registry == 'both'
@@ -151,6 +151,8 @@ jobs:
           for distribution in "$RUNNER_TEMP/pypi-release/"*; do
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
+            uv run --isolated --no-project --python 3.13 --with "$distribution" --with 'grpcio<2' \
+              python tests/grpc_python_test.py --allow-legacy
           done
   rust:
     needs: prepare
@@ -244,7 +246,7 @@ jobs:
         run: |
           uv run --no-project --python 3.13 python tools/release.py registry \
             --registry npm --directory release-dist --download "$RUNNER_TEMP/npm-release"
-          bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz
+          bash tests/test_installed_javascript.sh "$RUNNER_TEMP/npm-release/"*.tgz --allow-legacy
       - name: Verify PyPI after an npm-only recovery
         if: steps.published.outputs.ready == 'true' && needs.pypi.result == 'skipped'
         run: |
@@ -253,6 +255,8 @@ jobs:
           for distribution in "$RUNNER_TEMP/pypi-release/"*; do
             uv run --isolated --no-project --python 3.13 --with "$distribution" \
               python tests/packages_test.py --fixtures tests/fixtures.json
+            uv run --isolated --no-project --python 3.13 --with "$distribution" --with 'grpcio<2' \
+              python tests/grpc_python_test.py --allow-legacy
           done
       - name: Select the tested Go toolchain
         id: go_toolchain

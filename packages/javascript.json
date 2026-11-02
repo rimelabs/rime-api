@@ -19,10 +19,26 @@
         "types": "./commonjs/index.d.ts",
         "default": "./commonjs/index.js"
       }
+    },
+    "./grpc": {
+      "import": {
+        "types": "./esm/grpc.d.ts",
+        "default": "./esm/grpc.js"
+      },
+      "require": {
+        "types": "./commonjs/grpc.d.ts",
+        "default": "./commonjs/grpc.js"
+      }
     }
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.11.0"
+  },
+  "peerDependencies": {
+    "@grpc/grpc-js": "^1.14.0"
+  },
+  "peerDependenciesMeta": {
+    "@grpc/grpc-js": {"optional": true}
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

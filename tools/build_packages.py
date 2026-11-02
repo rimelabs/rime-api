@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tarfile
 
 from grpc_tools import protoc
@@ -89,6 +90,7 @@ def build(arguments: argparse.Namespace) -> None:
             f"-I{schema_directory}",
             f"--python_out={python_sources}",
             f"--pyi_out={python_sources}",
+            f"--grpc_python_out={python_sources}",
             *[name.replace("rime/", "rime_api/", 1) for name in schemas],
         ]
     )
@@ -136,6 +138,14 @@ def build(arguments: argparse.Namespace) -> None:
     (javascript / "package.json").write_text(
         (templates / "javascript.json").read_text().replace("@VERSION@", version)
     )
+    subprocess.run(
+        [
+            str(arguments.grpc_builder.absolute()),
+            str(javascript),
+            str(templates / "grpc.ts"),
+        ],
+        check=True,
+    )
 
     previous_directory = Path.cwd()
     try:
@@ -155,6 +165,7 @@ if __name__ == "__main__":
     parser.add_argument("--schema", action="append", required=True)
     parser.add_argument("--schema-workspace", type=Path, required=True)
     parser.add_argument("--plugin", type=Path, required=True)
+    parser.add_argument("--grpc-builder", type=Path, required=True)
     parser.add_argument("--templates", type=Path, required=True)
     parser.add_argument("--version", type=Path, required=True)
     parser.add_argument("--asyncapi", type=Path, action="append", required=True)

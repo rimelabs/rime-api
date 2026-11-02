@@ -34,6 +34,7 @@ for (const definitions of [esm, commonjs]) {
 }
 JS
 node smoke.mjs
+node --input-type=module -e 'import { createRequire } from "node:module"; import assert from "node:assert/strict"; assert.throws(() => createRequire(import.meta.url).resolve("@grpc/grpc-js"), {code: "MODULE_NOT_FOUND"});'
 cat >consumer.mts <<'TS'
 import { create } from '@bufbuild/protobuf';
 import { WebSocketRequestSchema } from '@rimelabs/api';
@@ -60,3 +61,21 @@ fi
 ./node_modules/.bin/tsc --strict --noEmit --target es2022 --module nodenext \
 	consumer.mts consumer.cts
 echo 'Installed npm package passes ESM, CommonJS, and TypeScript checks.'
+
+if [[ "${2:-}" == "--allow-legacy" ]] && node --input-type=module -e '
+import { readFileSync } from "node:fs";
+const manifest = JSON.parse(readFileSync("node_modules/@rimelabs/api/package.json", "utf8"));
+const [major, minor, patch] = manifest.version.split(".").map(Number);
+process.exit(!manifest.exports["./grpc"] && major === 0 && (minor < 4 || (minor === 4 && patch <= 1)) ? 0 : 1);
+'; then
+	echo 'Skipping gRPC checks for a release before packaged clients.'
+	exit 0
+fi
+npm install --ignore-scripts --no-audit --no-fund "${GRPC_REQUIREMENT:-@grpc/grpc-js@1.14.0}" @types/node@22.19.0
+cp "$source_directory/grpc_javascript_test.mjs" grpc_test.mjs
+node grpc_test.mjs
+cp "$source_directory/grpc_consumer.ts" grpc_consumer.mts
+cp "$source_directory/grpc_consumer.ts" grpc_consumer.cts
+./node_modules/.bin/tsc --strict --noEmit --target es2022 --module nodenext \
+	grpc_consumer.mts grpc_consumer.cts
+echo 'Installed npm package passes typed gRPC consumer checks.'

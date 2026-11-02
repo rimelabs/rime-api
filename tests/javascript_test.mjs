@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { fromBinary, fromJson, toBinary, toJson } from "@bufbuild/protobuf";
 import typescript from "typescript";
 
-const [packages, fixturePath] = process.argv.slice(2);
+const [packages, fixturePath, grpcConsumerPath] = process.argv.slice(2);
 const directory = resolve(packages, "javascript");
 const esm = await import(pathToFileURL(resolve(directory, "esm/index.js")));
 const require = createRequire(import.meta.url);
@@ -43,18 +43,18 @@ for (const definitions of [esm, commonjs]) {
 }
 console.log("ESM and CommonJS pass the shared binary and JSON fixtures.");
 
-const consumer = `
+const consumer = await readFile(grpcConsumerPath, "utf8") + `
 import { create } from "@bufbuild/protobuf";
 import { WebSocketRequestSchema, SpeechWebSocketRequestSchema, StreamingOutputContract } from "@rimelabs/api";
 import type { WebSocketRequest, SpeechWebSocketRequest } from "@rimelabs/api";
-const synthesis: WebSocketRequest = create(WebSocketRequestSchema, { payload: { case: "text", value: "Hello." } });
-const recognition: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
+const synthesisMessage: WebSocketRequest = create(WebSocketRequestSchema, { payload: { case: "text", value: "Hello." } });
+const recognitionMessage: SpeechWebSocketRequest = create(SpeechWebSocketRequestSchema, {
   payload: { case: "start", value: { language: "en", outputContract: StreamingOutputContract.REVISED_HYPOTHESES } },
 });
 // @ts-expect-error STT audio must be bytes.
-const invalidAudio: SpeechWebSocketRequest = { ...recognition, payload: { case: "audio", value: "audio" } };
+const invalidAudio: SpeechWebSocketRequest = { ...recognitionMessage, payload: { case: "audio", value: "audio" } };
 // @ts-expect-error TTS text must be a string.
-const invalidText: WebSocketRequest = { ...synthesis, payload: { case: "text", value: 42 } };
+const invalidText: WebSocketRequest = { ...synthesisMessage, payload: { case: "text", value: 42 } };
 `;
 for (const [format, extension] of [["esm", "mts"], ["commonjs", "cts"]]) {
   const filename = resolve(directory, `consumer.${extension}`);
@@ -63,7 +63,10 @@ for (const [format, extension] of [["esm", "mts"], ["commonjs", "cts"]]) {
     noEmit: true,
     target: typescript.ScriptTarget.ES2022,
     module: typescript.ModuleKind.NodeNext,
-    paths: { "@rimelabs/api": [resolve(directory, format, "index.d.ts")] },
+    paths: {
+      "@rimelabs/api": [resolve(directory, format, "index.d.ts")],
+      "@rimelabs/api/grpc": [resolve(directory, format, "grpc.d.ts")],
+    },
   };
   const host = typescript.createCompilerHost(options);
   const getSourceFile = host.getSourceFile.bind(host);

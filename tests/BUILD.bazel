@@ -95,20 +95,53 @@ py_test(
     ],
 )
 
+py_test(
+    name = "grpc_python_test",
+    size = "small",
+    srcs = ["grpc_python_test.py"],
+    args = [
+        "--packages",
+        "$(rootpath //:packages)",
+    ],
+    data = ["//:packages"],
+    legacy_create_init = 0,
+    deps = [
+        "@pip//googleapis_common_protos",
+        "@pip//grpcio",
+        "@pip//protobuf",
+    ],
+)
+
 js_test(
     name = "javascript_test",
     size = "small",
     args = [
         "$(rootpath //:packages)",
         "$(rootpath :fixtures.json)",
+        "$(rootpath :grpc_consumer.ts)",
     ],
     data = [
         "fixtures.json",
+        "grpc_consumer.ts",
         "//:node_modules/@bufbuild/protobuf",
+        "//:node_modules/@grpc/grpc-js",
+        "//:node_modules/@types/node",
         "//:node_modules/typescript",
         "//:packages",
     ],
     entry_point = "javascript_test.mjs",
+)
+
+js_test(
+    name = "grpc_javascript_test",
+    size = "small",
+    args = ["$(rootpath //:packages)"],
+    data = [
+        "//:node_modules/@bufbuild/protobuf",
+        "//:node_modules/@grpc/grpc-js",
+        "//:packages",
+    ],
+    entry_point = "grpc_javascript_test.mjs",
 )
 
 py_test(

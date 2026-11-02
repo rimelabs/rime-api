@@ -1,3 +1,4 @@
+load("@aspect_rules_js//js:defs.bzl", "js_binary")
 load("@aspect_rules_lint//format:defs.bzl", "format_multirun")
 load("@rules_java//java:java_binary.bzl", "java_binary")
 load("@rules_python//python:py_binary.bzl", "py_binary")
@@ -54,6 +55,18 @@ py_binary(
         "@pip//grpcio_tools",
         "@pip//hatchling",
     ],
+)
+
+js_binary(
+    name = "build_grpc",
+    data = [
+        "//:node_modules/@bufbuild/protobuf",
+        "//:node_modules/@grpc/grpc-js",
+        "//:node_modules/@types/node",
+        "//:node_modules/typescript",
+    ],
+    entry_point = "build_grpc.mjs",
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
