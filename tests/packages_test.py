@@ -19,8 +19,17 @@ class PackageTest(unittest.TestCase):
         self.assertEqual(distribution["Requires-Python"], ">=3.10")
         dependencies = distribution.get_all("Requires-Dist")
         self.assertCountEqual(
-            dependencies, ["protobuf>=5.29.6", "googleapis-common-protos>=1.70.0"]
+            [dependency for dependency in dependencies if ";" not in dependency],
+            ["protobuf>=5.29.6", "googleapis-common-protos>=1.70.0"],
         )
+        if packages is not None or "grpc" in distribution.get_all("Provides-Extra", []):
+            self.assertIn("grpcio<2,>=1.71.2; extra == 'grpc'", dependencies)
+            for service in ("speech_to_text", "text_to_speech"):
+                self.assertTrue(
+                    resources.files("rime_api")
+                    .joinpath(f"{service}_pb2_grpc.py")
+                    .is_file()
+                )
         source = json.loads(
             resources.files("rime_api").joinpath("SOURCE.json").read_text()
         )

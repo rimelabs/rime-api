@@ -97,6 +97,7 @@ api_packages(
         "//schema:speech_to_text.asyncapi.yaml",
         "//schema:text_to_speech.asyncapi.yaml",
     ],
+    grpc_builder = "//tools:build_grpc",
     license_files = [
         "LICENSE",
         "NOTICE",
@@ -112,6 +113,7 @@ api_packages(
         "//packages:README.md",
         "//packages:python.toml",
         "//packages:javascript.json",
+        "//packages:grpc.ts",
     ],
     version = "VERSION",
     visibility = ["//visibility:public"],

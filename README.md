@@ -55,9 +55,11 @@ or import `SpeechWebSocketRequestSchema` from `@rimelabs/api` in JavaScript.
 See [STT examples](packages/README.md#speech-to-text).
 
 Python requires version 3.10 or newer. JavaScript supports ESM and CommonJS,
-with TypeScript declarations. These packages supply message definitions.
-Applications and framework adapters manage connections, authentication,
-cancellation, and audio playback. See [package details](packages/README.md).
+with TypeScript declarations. These packages supply message definitions and
+optional gRPC clients for both services. Install `rime-api[grpc]` for Python,
+or install `@grpc/grpc-js` and import `@rimelabs/api/grpc` for Node.js.
+Applications supply endpoints, TLS settings, authentication metadata,
+cancellation policy, and audio playback. See [gRPC client details](packages/README.md#grpc-clients).
 
 ## Build and test
 
@@ -83,7 +85,7 @@ for Cargo checks and `bazel run //:cargo -- package -p rimelabs-api --locked` fo
 crate archive in `target/package/`. Consumers do not need Bazel or protoc.
 
 The tests cover shared binary and JSON fixtures, Python imports and typing,
-JavaScript module formats, and Copybara export behavior. CI also installs the
+JavaScript module formats, gRPC calls to a local server, and Copybara export behavior. CI also installs the
 archives across Python 3.10 through 3.14 and Node.js 20, 22, and 24.
 
 Python dependency changes use uv:

@@ -13,6 +13,9 @@ license-files = ["LICENSE", "NOTICE", "PROTOBUF_LICENSE"]
 authors = [{ name = "Rime" }]
 dependencies = ["protobuf>=5.29.6", "googleapis-common-protos>=1.70.0"]
 
+[project.optional-dependencies]
+grpc = ["grpcio>=1.71.2,<2"]
+
 [project.urls]
 Documentation = "https://docs.rime.ai"
 Repository = "https://github.com/rimelabs/rime-api"
