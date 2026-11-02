@@ -14,6 +14,11 @@ const synthesis = new TextToSpeechClient("localhost:50051", credentials.createIn
 const transcription = createMessage(TranscriptionRequestSchema, { audio: new Uint8Array([1, 2]) });
 const metadata = new Metadata();
 const options = { deadline: Date.now() + 1000 };
+SpeechToTextClient.service.transcribe.requestSerialize(transcription);
+// @ts-expect-error Service serializers require the matching request type.
+SpeechToTextClient.service.transcribe.requestSerialize(createMessage(SynthesisRequestSchema));
+// @ts-expect-error Unknown service methods are not defined.
+SpeechToTextClient.service.missingMethod;
 const callback = (error: Error | null, response?: TranscriptionResponse) => {
   if (response) {
     const text: string = response.text;

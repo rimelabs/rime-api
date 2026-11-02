@@ -11,7 +11,7 @@ import type {
   ClientUnaryCall,
   ClientWritableStream,
   Metadata,
-  ServiceDefinition,
+  MethodDefinition,
   requestCallback as UnaryCallback,
 } from "@grpc/grpc-js";
 import { SpeechToText } from "./rime/speech_to_text_pb.js";
@@ -40,26 +40,36 @@ type ServiceClient<Service extends DescService> = Client & {
   [Name in keyof Service["method"]]: ClientMethod<Service["method"][Name]>;
 };
 
+type GrpcServiceDefinition<Service extends DescService> = {
+  [Name in keyof Service["method"]]: MethodDefinition<
+    MessageShape<Service["method"][Name]["input"]>,
+    MessageShape<Service["method"][Name]["output"]>
+  >;
+};
+
 type ClientConstructor<Service extends DescService> = {
   new(address: string, credentials: ChannelCredentials, options?: ClientOptions): ServiceClient<Service>;
-  service: ServiceDefinition;
+  service: GrpcServiceDefinition<Service>;
   serviceName: string;
 };
 
 function createClientConstructor<Service extends DescService>(service: Service): ClientConstructor<Service> {
-  const methods: Record<string, ServiceDefinition[string]> = {};
-  for (const method of service.methods) {
-    methods[method.localName] = {
+  const descriptors: Service["method"] = service.method;
+  const methods = {} as GrpcServiceDefinition<Service>;
+  for (const name in descriptors) {
+    type Method = Service["method"][typeof name];
+    const method = descriptors[name];
+    methods[name] = {
       path: `/${service.typeName}/${method.name}`,
       requestStream: method.methodKind === "client_streaming" || method.methodKind === "bidi_streaming",
       responseStream: method.methodKind === "server_streaming" || method.methodKind === "bidi_streaming",
       requestSerialize: message => Buffer.from(toBinary(method.input, message)),
-      requestDeserialize: bytes => fromBinary(method.input, bytes),
+      requestDeserialize: bytes => fromBinary<Method["input"]>(method.input, bytes),
       responseSerialize: message => Buffer.from(toBinary(method.output, message)),
-      responseDeserialize: bytes => fromBinary(method.output, bytes),
+      responseDeserialize: bytes => fromBinary<Method["output"]>(method.output, bytes),
     };
   }
-  return makeGenericClientConstructor(methods, service.typeName) as unknown as ClientConstructor<Service>;
+  return makeGenericClientConstructor(methods, service.typeName) as ClientConstructor<Service>;
 }
 
 /** A native grpc-js client for whole-recording and streaming transcription. */
