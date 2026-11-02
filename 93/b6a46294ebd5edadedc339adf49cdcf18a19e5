@@ -1,0 +1,80 @@
+packages/javascript.json
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 22-31,37-42
+tests/grpc_python_test.py
+  s_ef0684f4a92cb1::t_9f48472b53b23a 1-5,7-19,21-22,24-54,56-77,79-83,85,87-94,96-100,102-108,110-114,116-122,126,128-146,148-160,162-165,167-175,177-191,193-194,196-200,202-206,208-212,214-224,226-246,248-249,253-271,273-290,292-296,298-302,304-323,325-327,335-340
+  s_ef0684f4a92cb1::t_2db7714fa389e3 250-252
+  s_ef0684f4a92cb1::t_dc646f405f325e 6,324,328-334
+  s_ef0684f4a92cb1::t_f628b441d02e3d 20,23,55,78,84,86,95,101,109,115,123-125,127,147,161,166,176,192,195,201,207,213,225,247,272,291,297,303
+tests/grpc_consumer.ts
+  s_ef0684f4a92cb1::t_ad18817f09e45a 42-47
+  s_ef0684f4a92cb1::t_8e7afe871102a9 1-41,48-66
+tests/grpc_javascript_test.mjs
+  s_ef0684f4a92cb1::t_5f264f10dc296b 51-54,66-69
+  s_ef0684f4a92cb1::t_8e7afe871102a9 1-50,55-65,70-137
+tools/BUILD.bazel
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 1,60-69
+  s_ef0684f4a92cb1::t_0f16daa9f33898 70-71
+tools/build_grpc.mjs
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 1-22,24-38
+  s_ef0684f4a92cb1::t_80fd9ea5d84e34 23
+packages/grpc.ts
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 1-14,16-49,51-65,67-69,71
+  s_ef0684f4a92cb1::t_80fd9ea5d84e34 15,50
+  s_ef0684f4a92cb1::t_dc646f405f325e 66,70
+packages/README.md
+  s_ef0684f4a92cb1::t_f6c8ad4be158f1 3,91-93,108-157
+  s_ef0684f4a92cb1::t_c58aa39ed72aba 158
+BUILD.bazel
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 116
+  s_ef0684f4a92cb1::t_7488068e7c1f5b 100
+package.json
+  s_ef0684f4a92cb1::t_e16a935aa27085 9
+  s_ef0684f4a92cb1::t_2fc23332b077c3 7-8
+README.md
+  s_ef0684f4a92cb1::t_f6c8ad4be158f1 58-62,88
+packages/BUILD.bazel
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 2
+tools/build_packages.py
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 11,93,141-144,146-148,168
+  s_ef0684f4a92cb1::t_954f31d3778932 145
+.github/workflows/check.yaml
+  s_ef0684f4a92cb1::t_dc646f405f325e 90-93,96-122,129-132,143-144
+.github/workflows/release.yaml
+  s_ef0684f4a92cb1::t_dc646f405f325e 113,154-155,249,258-259
+tests/packages_test.py
+  s_ef0684f4a92cb1::t_9f48472b53b23a 22-23,25,27-32
+  s_ef0684f4a92cb1::t_dc646f405f325e 26
+packages/python.toml
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 16-18
+tests/BUILD.bazel
+  s_ef0684f4a92cb1::t_9f48472b53b23a 98-103,105-114,145
+  s_ef0684f4a92cb1::t_8e7afe871102a9 121,125,127,135-144
+  s_ef0684f4a92cb1::t_5f264f10dc296b 128
+  s_ef0684f4a92cb1::t_ff96f1ad3fa4b0 104,146
+tests/javascript_test.mjs
+  s_ef0684f4a92cb1::t_8e7afe871102a9 9,46,66-69
+  s_ef0684f4a92cb1::t_5f264f10dc296b 50-51,55,57
+tests/test_installed_javascript.sh
+  s_ef0684f4a92cb1::t_ad18817f09e45a 74
+  s_ef0684f4a92cb1::t_dc646f405f325e 37,64-73,75-81
+packages/packages.bzl
+  s_ef0684f4a92cb1::t_6a492eb4bee9b2 43,53,65
+pnpm-lock.yaml
+  s_ef0684f4a92cb1::t_664fa1c9cce85f 14-19,37-65,70-83,92-106,109-120,129-142,159-183,190-202,206-211,213-234,237-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "93b6a46294ebd5edadedc339adf49cdcf18a19e5",
+  "prompts": {},
+  "sessions": {
+    "s_ef0684f4a92cb1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19d2a-3f51-73f1-bcd5-1f08569ae86b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
