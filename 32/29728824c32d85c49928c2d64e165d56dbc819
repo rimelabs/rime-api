@@ -1,0 +1,22 @@
+tests/grpc_consumer.ts
+  s_ef0684f4a92cb1::t_be4b1e90e4f553 17-21
+packages/grpc.ts
+  s_ef0684f4a92cb1::t_a856c87c44f55e 60,67,69
+  s_ef0684f4a92cb1::t_be4b1e90e4f553 14,43-49,52,57-59,61-62,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3229728824c32d85c49928c2d64e165d56dbc819",
+  "prompts": {},
+  "sessions": {
+    "s_ef0684f4a92cb1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a19d2a-3f51-73f1-bcd5-1f08569ae86b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
