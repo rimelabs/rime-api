@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/rimelabs/rime-api/compare/v0.4.0...v0.4.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* publish complete schema sync commits ([#23](https://github.com/rimelabs/rime-api/issues/23)) ([30c317c](https://github.com/rimelabs/rime-api/commit/30c317cc2bfc7942ed57b40b4bec8e64201e8c75))
+
 ## [0.4.0](https://github.com/rimelabs/rime-api/compare/v0.3.0...v0.4.0) (2026-10-10)
 
 
