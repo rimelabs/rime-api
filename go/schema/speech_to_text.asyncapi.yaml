@@ -77,6 +77,12 @@ info:
     transport EOF; clients must treat any connection that ends before a
     terminal event as an incomplete utterance, never as an empty success.
 
+    ### Authentication
+
+    Unauthenticated by default. With Themis authentication enabled, an
+    upgrade a trusted gateway marks `x-rime-authentication: themis` must carry
+    `Authorization: Bearer <token>`.
+
 servers:
   engine:
     host: '{host}'
