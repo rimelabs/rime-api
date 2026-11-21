@@ -44,10 +44,11 @@ info:
     `start.language`, `start.mode` and `start.contextTerms` are recognition
     controls accepted under either contract.
 
-    The output contract and the language are required. Unset, unspecified and
-    unrecognized values are rejected with `invalid_input`. Every accepted
-    selection is confirmed on `started.accepted` before any audio-derived
-    response.
+    The output contract is required: unset, unspecified and unrecognized
+    values are rejected with `invalid_input`. Append fragments require a
+    language; under revised hypotheses it is optional, and without one, or
+    with `und`, the model detects it. Every accepted selection is confirmed
+    on `started.accepted` before any audio-derived response.
 
     ### Framing and bounds
 
@@ -76,6 +77,12 @@ info:
     shutdown can instead end the connection with only a Close frame or
     transport EOF; clients must treat any connection that ends before a
     terminal event as an incomplete utterance, never as an empty success.
+
+    ### Authentication
+
+    Unauthenticated by default. With Themis authentication enabled, an
+    upgrade a trusted gateway marks `x-rime-authentication: themis` must carry
+    `Authorization: Bearer <token>`.
 
 servers:
   engine:
@@ -254,7 +261,7 @@ components:
                 description: >-
                   Present for every accepted configuration, confirming its
                   explicitly selected output contract.
-                required: [outputContract, language]
+                required: [outputContract]
                 properties:
                   outputContract:
                     $ref: '#/components/schemas/streamingOutputContract'
@@ -262,7 +269,8 @@ components:
                     allOf:
                       - $ref: '#/components/schemas/resolvedLanguage'
                     description: >-
-                      Confirms the selected language.
+                      Confirms the language the client selected; absent when
+                      the model detects it.
 
     delta:
       name: delta
@@ -327,7 +335,9 @@ components:
                 allOf:
                   - $ref: '#/components/schemas/resolvedLanguage'
                 description: >-
-                  The selected catalog language, under either contract.
+                  The selected or detected catalog language, under either
+                  contract; absent when the model, left to detect it, heard
+                  no speech.
               revision:
                 type: string
                 description: >-
@@ -380,17 +390,24 @@ components:
       type: object
       description: >-
         Proto3 JSON encoding of `rime.StreamingConfig`. An empty
-        configuration is invalid: outputContract and language must be
-        explicitly selected. The recognition controls `language`, `mode` and
-        `contextTerms` apply under either output contract.
-      required: [outputContract, language]
+        configuration is invalid: outputContract must be explicitly selected.
+        The recognition controls `language`, `mode` and `contextTerms` apply
+        under either output contract.
+      required: [outputContract]
       properties:
         language:
           type: string
           description: >-
-            Required BCP-47 tag of the spoken language, passed to the service
-            unchanged; an omitted tag or "und" is rejected with
-            `invalid_input`.
+            BCP-47 tag of the spoken language, passed to the service unchanged
+            and resolved against the packaged catalog, for example "en",
+            "es-MX" or "cmn"; "zh" resolves to Mandarin, reported as "cmn".
+            Append fragments require one; under revised hypotheses an omitted
+            tag or "und" leaves the model to detect the language. A `mode` the
+            catalog does not allow for the language, an append start without a
+            language, or a detected language outside the catalog, is rejected
+            with `invalid_input`: before `started` for a selected or missing
+            language, and as the terminal `error` once a decode of at least
+            8 s of audio, or the final decode, names a detected one.
         mode:
           $ref: '#/components/schemas/transcriptionMode'
         outputContract:
@@ -404,11 +421,11 @@ components:
           description: >-
             Recognition terms that softly bias recognition without forcing
             matches. An omitted or empty list adds no bias. The service rejects
-            empty or whitespace-only terms and preserves term order and text,
-            joining them with ", " before composition into the packaged mode
-            prompt. The model's UTF-8 caller-context byte budget includes the
-            separators. Per-word weights are not supported. A scalar string is
-            invalid.
+            empty or whitespace-only terms, trims each term of surrounding
+            whitespace and keeps their order, joining them with ", " before
+            composition into the packaged mode prompt. The model's UTF-8
+            caller-context byte budget includes the separators. Per-word weights
+            are not supported. A scalar string is invalid.
 
     streamingOutputContract:
       type: string
@@ -426,6 +443,7 @@ components:
         - TRANSCRIPTION_MODE_UNSPECIFIED
         - TRANSCRIPTION_MODE_WRITTEN
         - TRANSCRIPTION_MODE_VERBATIM
+        - TRANSCRIPTION_MODE_TAGGED
       description: >-
         Symbolic enum name in proto3 JSON. Unspecified defaults to written
         formatting; see the mode documentation in
