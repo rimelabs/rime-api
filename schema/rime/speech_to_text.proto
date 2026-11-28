@@ -23,25 +23,37 @@ service SpeechToText {
 enum TranscriptionMode {
   // Defaults to TRANSCRIPTION_MODE_WRITTEN.
   TRANSCRIPTION_MODE_UNSPECIFIED = 0;
-  // Standard written formatting: numerals as digits, codes compact.
-  // "flight two four seven" is intended to come back as "flight 247".
+  // Standard written formatting, the model's default: numbers from 10 up as
+  // digits, one to nine as words. "twenty five people in three rooms" is
+  // intended to come back as "25 people in three rooms".
   TRANSCRIPTION_MODE_WRITTEN = 1;
   // Verbatim rendering: keep every filler, repetition, and false start;
   // numbers as spoken words. "uh flight two four seven" is intended to come
   // back as "uh flight two four seven".
   TRANSCRIPTION_MODE_VERBATIM = 2;
+  // Verbatim rendering that also marks non-speech sounds inline, such as
+  // "[laugh]", and wraps speech said a particular way in a span tag, such as
+  // "[whisper]...[/whisper]". Tags come back as the model writes them. Only
+  // the languages whose catalog entry allows it accept this mode.
+  TRANSCRIPTION_MODE_TAGGED = 3;
 }
 
 message TranscriptionOptions {
-  // Required BCP-47 tag of the spoken language, resolved against the packaged
-  // catalog (`en` or `es`). An omitted tag or `und` is rejected with
-  // INVALID_ARGUMENT.
+  // Optional BCP-47 tag of the spoken language, resolved against the packaged
+  // catalog, for example `en`, `es-MX` or `cmn`. `zh` with any region or
+  // script, such as `zh-TW`, `zh-HK` or `zh-Hant`, resolves to Mandarin,
+  // reported as `cmn`; Cantonese (`yue`, `zh-yue`) is not supported. An
+  // omitted tag or `und` leaves the model to detect the language. A `mode`
+  // the catalog does not allow for the language, or a detected language
+  // outside the catalog, fails with INVALID_ARGUMENT, before any audio for a
+  // selected language and once the model names a detected one.
   optional string language = 1;
   TranscriptionMode mode = 2;
   // Recognition terms, for example ["Mitchell Gourley", "Super-G", "USOC"].
   // An empty list adds no bias; the service rejects empty or whitespace-only
-  // terms. Order and term text are preserved, with ", " inserted between
-  // terms before composition into the packaged mode prompt. The packaged
+  // terms. Order is preserved and each term is trimmed of surrounding
+  // whitespace, with ", " inserted between terms before composition into the
+  // packaged mode prompt. The packaged
   // model's caller-context budget counts UTF-8 bytes including separators;
   // the composed prompt keeps the mode prompt intact.
   // Terms softly bias recognition without forcing a match; per-word weights
@@ -58,8 +70,7 @@ enum LanguageSource {
   // The caller supplied the language and the service confirmed it against
   // the packaged model catalog.
   LANGUAGE_SOURCE_SELECTED = 1;
-  // The model detected the served catalog language. Not produced while every
-  // request must select its language.
+  // The model detected the served catalog language.
   LANGUAGE_SOURCE_DETECTED = 2;
 }
 
@@ -75,13 +86,15 @@ message TranscriptionRequest {
   // packaged decoder may accept other WAV encodings/rates; those extensions
   // are not a portable interface guarantee. Headerless PCM is not WAV.
   bytes audio = 1;
-  // Required: `language` must select the spoken language.
+  // Absent options select no language, which the model then detects, and
+  // written mode.
   optional TranscriptionOptions options = 2;
 }
 
 message TranscriptionResponse {
   string text = 1;
-  // The canonical catalog language the caller selected.
+  // The canonical catalog language the caller selected or the model
+  // detected; absent when the model, left to detect it, heard no speech.
   optional ResolvedLanguage language = 2;
 }
 
@@ -110,9 +123,15 @@ message StreamingConfig {
   reserved 1, 2;
   reserved "sample_rate_hertz", "channels";
 
-  // Under either output contract, `language` is a required BCP-47 tag (an
-  // omitted tag or `und` is rejected) and `mode` selects the written or
-  // verbatim prompt.
+  // `language` is a BCP-47 tag, resolved and checked as in
+  // TranscriptionOptions, and `mode` selects the written, verbatim or tagged
+  // prompt. STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS requires a language: an
+  // omitted tag or `und` is INVALID_ARGUMENT before `accepted`. Under
+  // STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES an omitted tag or `und` leaves
+  // the model to detect the language, and a detected language outside the
+  // catalog, or one that does not allow the mode, ends the stream with
+  // INVALID_ARGUMENT after `accepted`, once a decode of at least 8 s of audio,
+  // or the final decode, names it.
   optional string language = 3;
   TranscriptionMode mode = 4;
 
@@ -164,7 +183,8 @@ message StreamingTranscriptionResponse {
 
 message StreamingAccepted {
   StreamingOutputContract output_contract = 1;
-  // Confirms the selected language.
+  // Confirms the language the caller selected; absent when the model detects
+  // it.
   optional ResolvedLanguage language = 2;
 }
 

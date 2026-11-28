@@ -28,13 +28,19 @@ type TranscriptionMode int32
 const (
 	// Defaults to TRANSCRIPTION_MODE_WRITTEN.
 	TranscriptionMode_TRANSCRIPTION_MODE_UNSPECIFIED TranscriptionMode = 0
-	// Standard written formatting: numerals as digits, codes compact.
-	// "flight two four seven" is intended to come back as "flight 247".
+	// Standard written formatting, the model's default: numbers from 10 up as
+	// digits, one to nine as words. "twenty five people in three rooms" is
+	// intended to come back as "25 people in three rooms".
 	TranscriptionMode_TRANSCRIPTION_MODE_WRITTEN TranscriptionMode = 1
 	// Verbatim rendering: keep every filler, repetition, and false start;
 	// numbers as spoken words. "uh flight two four seven" is intended to come
 	// back as "uh flight two four seven".
 	TranscriptionMode_TRANSCRIPTION_MODE_VERBATIM TranscriptionMode = 2
+	// Verbatim rendering that also marks non-speech sounds inline, such as
+	// "[laugh]", and wraps speech said a particular way in a span tag, such as
+	// "[whisper]...[/whisper]". Tags come back as the model writes them. Only
+	// the languages whose catalog entry allows it accept this mode.
+	TranscriptionMode_TRANSCRIPTION_MODE_TAGGED TranscriptionMode = 3
 )
 
 // Enum value maps for TranscriptionMode.
@@ -43,11 +49,13 @@ var (
 		0: "TRANSCRIPTION_MODE_UNSPECIFIED",
 		1: "TRANSCRIPTION_MODE_WRITTEN",
 		2: "TRANSCRIPTION_MODE_VERBATIM",
+		3: "TRANSCRIPTION_MODE_TAGGED",
 	}
 	TranscriptionMode_value = map[string]int32{
 		"TRANSCRIPTION_MODE_UNSPECIFIED": 0,
 		"TRANSCRIPTION_MODE_WRITTEN":     1,
 		"TRANSCRIPTION_MODE_VERBATIM":    2,
+		"TRANSCRIPTION_MODE_TAGGED":      3,
 	}
 )
 
@@ -89,8 +97,7 @@ const (
 	// The caller supplied the language and the service confirmed it against
 	// the packaged model catalog.
 	LanguageSource_LANGUAGE_SOURCE_SELECTED LanguageSource = 1
-	// The model detected the served catalog language. Not produced while every
-	// request must select its language.
+	// The model detected the served catalog language.
 	LanguageSource_LANGUAGE_SOURCE_DETECTED LanguageSource = 2
 )
 
@@ -199,15 +206,21 @@ func (StreamingOutputContract) EnumDescriptor() ([]byte, []int) {
 
 type TranscriptionOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Required BCP-47 tag of the spoken language, resolved against the packaged
-	// catalog (`en` or `es`). An omitted tag or `und` is rejected with
-	// INVALID_ARGUMENT.
+	// Optional BCP-47 tag of the spoken language, resolved against the packaged
+	// catalog, for example `en`, `es-MX` or `cmn`. `zh` with any region or
+	// script, such as `zh-TW`, `zh-HK` or `zh-Hant`, resolves to Mandarin,
+	// reported as `cmn`; Cantonese (`yue`, `zh-yue`) is not supported. An
+	// omitted tag or `und` leaves the model to detect the language. A `mode`
+	// the catalog does not allow for the language, or a detected language
+	// outside the catalog, fails with INVALID_ARGUMENT, before any audio for a
+	// selected language and once the model names a detected one.
 	Language *string           `protobuf:"bytes,1,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	Mode     TranscriptionMode `protobuf:"varint,2,opt,name=mode,proto3,enum=rime.TranscriptionMode" json:"mode,omitempty"`
 	// Recognition terms, for example ["Mitchell Gourley", "Super-G", "USOC"].
 	// An empty list adds no bias; the service rejects empty or whitespace-only
-	// terms. Order and term text are preserved, with ", " inserted between
-	// terms before composition into the packaged mode prompt. The packaged
+	// terms. Order is preserved and each term is trimmed of surrounding
+	// whitespace, with ", " inserted between terms before composition into the
+	// packaged mode prompt. The packaged
 	// model's caller-context budget counts UTF-8 bytes including separators;
 	// the composed prompt keeps the mode prompt intact.
 	// Terms softly bias recognition without forcing a match; per-word weights
@@ -328,7 +341,8 @@ type TranscriptionRequest struct {
 	// packaged decoder may accept other WAV encodings/rates; those extensions
 	// are not a portable interface guarantee. Headerless PCM is not WAV.
 	Audio []byte `protobuf:"bytes,1,opt,name=audio,proto3" json:"audio,omitempty"`
-	// Required: `language` must select the spoken language.
+	// Absent options select no language, which the model then detects, and
+	// written mode.
 	Options       *TranscriptionOptions `protobuf:"bytes,2,opt,name=options,proto3,oneof" json:"options,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -381,7 +395,8 @@ func (x *TranscriptionRequest) GetOptions() *TranscriptionOptions {
 type TranscriptionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Text  string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
-	// The canonical catalog language the caller selected.
+	// The canonical catalog language the caller selected or the model
+	// detected; absent when the model, left to detect it, heard no speech.
 	Language      *ResolvedLanguage `protobuf:"bytes,2,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -435,9 +450,15 @@ func (x *TranscriptionResponse) GetLanguage() *ResolvedLanguage {
 // 16 kHz; the format is not configurable.
 type StreamingConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Under either output contract, `language` is a required BCP-47 tag (an
-	// omitted tag or `und` is rejected) and `mode` selects the written or
-	// verbatim prompt.
+	// `language` is a BCP-47 tag, resolved and checked as in
+	// TranscriptionOptions, and `mode` selects the written, verbatim or tagged
+	// prompt. STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS requires a language: an
+	// omitted tag or `und` is INVALID_ARGUMENT before `accepted`. Under
+	// STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES an omitted tag or `und` leaves
+	// the model to detect the language, and a detected language outside the
+	// catalog, or one that does not allow the mode, ends the stream with
+	// INVALID_ARGUMENT after `accepted`, once a decode of at least 8 s of audio,
+	// or the final decode, names it.
 	Language *string           `protobuf:"bytes,3,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	Mode     TranscriptionMode `protobuf:"varint,4,opt,name=mode,proto3,enum=rime.TranscriptionMode" json:"mode,omitempty"`
 	// Explicitly selects the output contract. The service confirms the
@@ -729,7 +750,8 @@ func (*StreamingTranscriptionResponse_Hypothesis) isStreamingTranscriptionRespon
 type StreamingAccepted struct {
 	state          protoimpl.MessageState  `protogen:"open.v1"`
 	OutputContract StreamingOutputContract `protobuf:"varint,1,opt,name=output_contract,json=outputContract,proto3,enum=rime.StreamingOutputContract" json:"output_contract,omitempty"`
-	// Confirms the selected language.
+	// Confirms the language the caller selected; absent when the model detects
+	// it.
 	Language      *ResolvedLanguage `protobuf:"bytes,2,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1517,11 +1539,12 @@ const file_rime_speech_to_text_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x03 \x01(\tH\x00R\trequestId\x88\x01\x01B\r\n" +
 	"\v_request_id\"\x1a\n" +
-	"\x18SpeechWebSocketCancelled*x\n" +
+	"\x18SpeechWebSocketCancelled*\x97\x01\n" +
 	"\x11TranscriptionMode\x12\"\n" +
 	"\x1eTRANSCRIPTION_MODE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aTRANSCRIPTION_MODE_WRITTEN\x10\x01\x12\x1f\n" +
-	"\x1bTRANSCRIPTION_MODE_VERBATIM\x10\x02*m\n" +
+	"\x1bTRANSCRIPTION_MODE_VERBATIM\x10\x02\x12\x1d\n" +
+	"\x19TRANSCRIPTION_MODE_TAGGED\x10\x03*m\n" +
 	"\x0eLanguageSource\x12\x1f\n" +
 	"\x1bLANGUAGE_SOURCE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18LANGUAGE_SOURCE_SELECTED\x10\x01\x12\x1c\n" +
